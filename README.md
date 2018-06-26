@@ -5,9 +5,9 @@
 ImageIO plugin that allows you to use OziExplorer image files(ozf2/ozf3/ozf4) without using GDAL/OziApi or any other environment dependencies.
 
 It's as easy as reading any other image file
-
+```java
     BufferedImage ozfImage = ImageIO.read(new File("image.ozf3"));
-    
+```
 Just add dependency to your _pom.xml_
 ```xml
     <dependency>

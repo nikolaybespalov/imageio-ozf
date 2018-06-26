@@ -1,6 +1,5 @@
 package com.github.nikolaybespalov.imageioozf;
 
-import com.google.common.io.Files;
 import com.google.common.io.Resources;
 import org.apache.commons.io.FileUtils;
 import org.junit.Test;
@@ -8,7 +7,6 @@ import org.junit.Test;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.FileImageInputStream;
 import javax.imageio.stream.ImageInputStream;
-import java.io.File;
 import java.io.IOException;
 
 import static org.junit.Assert.assertEquals;

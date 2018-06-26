@@ -12,17 +12,29 @@ import javax.imageio.stream.ImageInputStream;
 import java.awt.color.ColorSpace;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBuffer;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.zip.DataFormatException;
+import java.util.zip.Deflater;
+import java.util.zip.Inflater;
 
-// https://trac.osgeo.org/gdal/browser/sandbox/klokan/ozf/ozf-binary-format-description.txt
-// http://www.oziexplorer3.com/eng/help/map_file_format.html
+/**
+ * @see <a href="https://trac.osgeo.org/gdal/browser/sandbox/klokan/ozf/ozf-binary-format-description.txt">ozf-binary-format-description.txt</a>
+ */
 public final class OzfImageReader extends ImageReader {
-    private ImageInputStream stream = null;
-    private byte k2;
-    private boolean isOzf3 = false;
+    private static final int FILE_HEADER_SIZE = 14;
+    private static final int INITIAL_KEY_INDEX = 0x93;
+    private static final int OZF3_HEADER_SIZE = 16;
+    private ImageInputStream stream;
+    private ImageInputStream encryptedStream;
+    private boolean isOzf3;
+    private byte key;
+    private int keyTableSize;
     private int width;
     private int height;
     private int bpp;
@@ -40,7 +52,7 @@ public final class OzfImageReader extends ImageReader {
     }
 
     @Override
-    public int getNumImages(boolean b) throws IOException {
+    public int getNumImages(boolean allowSearch) throws IOException {
         return 1;
     }
 
@@ -94,8 +106,8 @@ public final class OzfImageReader extends ImageReader {
     }
 
     @Override
-    public void setInput(Object input, boolean seekForwardOnly, boolean ignoreMetadata) {
-        super.setInput(input, seekForwardOnly, ignoreMetadata);
+    public void setInput(Object input) {
+        super.setInput(input);
 
         if (!(input instanceof ImageInputStream)) {
             throw new IllegalArgumentException("input not an ImageInputStream!");
@@ -105,63 +117,163 @@ public final class OzfImageReader extends ImageReader {
         stream.setByteOrder(ByteOrder.LITTLE_ENDIAN);
 
         try {
-            byte[] header = new byte[14];
-
-            stream.readFully(header);
+            byte[] header = readFileHeader();
 
             isOzf3 = (header[0] == (byte) 0x80) && (header[1] == (byte) 0x77);
-        } catch (IOException e) {
-            throw new IllegalArgumentException(e);
-        }
-
-        if (isOzf3) {
-            try {
-                int n = stream.readByte() & 0xFF;
-
-                if (n < 0x94) {
-                    throw new IllegalArgumentException("");
-                }
-
-                byte[] b = new byte[n];
-
-                stream.readFully(b);
-
-                byte k = b[0x93];
-
-                k2 = (byte) ((k + 0x8A) & 0xFF);
-
-                stream.skipBytes(4);
-            } catch (IOException e) {
-                throw new IllegalArgumentException(e);
-            }
-        }
-
-        try {
-            byte[] header2 = new byte[40];
-
-            if (stream.read(header2) != 40) {
-                throw new IllegalArgumentException();
-            }
 
             if (isOzf3) {
-                decrypt(header2, 0, 40, k2);
+                byte[] keyTable = readKeyTable();
+
+                int keyTableSize = keyTable.length;
+
+                if (keyTableSize < INITIAL_KEY_INDEX + 1) {
+                    throw new IOException("Too few data");
+                }
+
+                byte initialKey = keyTable[INITIAL_KEY_INDEX];
+
+                key = (byte) ((initialKey + 0x8A) & 0xFF);
+
+                encryptedStream = new OzfEncryptedStream(stream, key);
+
+                readOzf3Header(keyTableSize);
+
+                int imageTableOffset = readImageTableOffset();
+
+                int imageTableSize = (int) stream.length() - imageTableOffset - 4;
+
+                int images = imageTableSize / 4;
+
+                stream.seek(imageTableOffset);
+
+                int[] imageOffsets = new int[images];
+
+                for (int imageIndex = 0; imageIndex < images; imageIndex++) {
+                    imageOffsets[imageIndex] = Integer.reverseBytes(encryptedStream.readInt());
+                }
+
+                for (int imageIndex = 0; imageIndex < images; imageIndex++) {
+                    int imageOffset = imageOffsets[imageIndex];
+
+                    stream.seek(imageOffset);
+
+                    int width = Integer.reverseBytes(encryptedStream.readInt());
+                    int height = Integer.reverseBytes(encryptedStream.readInt());
+                    short xTiles = Short.reverseBytes(encryptedStream.readShort());
+                    short xyTiles = Short.reverseBytes(encryptedStream.readShort());
+                    byte[] palette = new byte[1024];
+                    encryptedStream.readFully(palette);
+
+                    int tiles = xTiles * xyTiles + 1;
+
+                    int[] tileOffsets = new int[tiles];
+
+                    for (int tileIndex = 0; tileIndex < tiles; tileIndex++) {
+                        tileOffsets[tileIndex] = Integer.reverseBytes(encryptedStream.readInt());
+                    }
+
+                    int tileSize = tileOffsets[1] - tileOffsets[0];
+
+                    stream.seek(tileOffsets[0]);
+
+                    byte[] tile = new byte[tileSize];
+
+                    stream.readFully(tile);
+
+                    int encryptionDepth = getEncryptionDepth(tile, tileSize, key);
+
+                    int asd = 0;
+                    int asdf = asd;
+                }
             }
-
-            int headerSize = readInt(header2, 0);
-
-            if (headerSize != 40) {
-                throw new IllegalArgumentException();
-            }
-
-            width = readInt(header2, 4);
-            height = readInt(header2, 8);
-            depth = readShort(header2, 12);
-            bpp = readShort(header2, 14);
-
-            int asd = 0;
-            int asdf = asd;
         } catch (IOException e) {
             throw new IllegalArgumentException(e);
+        }
+
+    }
+
+    private byte[] readFileHeader() throws IOException {
+        stream.seek(0);
+
+        byte[] header = new byte[14];
+
+        stream.readFully(header);
+
+        return header;
+    }
+
+    private byte[] readKeyTable() throws IOException {
+        stream.seek(FILE_HEADER_SIZE);
+
+        int n = stream.read();
+
+        byte[] b = new byte[n];
+
+        stream.readFully(b);
+
+        return b;
+    }
+
+    private void readOzf3Header(int keyTableSize) throws IOException {
+        encryptedStream.seek(FILE_HEADER_SIZE + keyTableSize + 1 + 4);
+
+        //encryptedStream.skipBytes(4);
+
+        byte[] ozf3Header = new byte[OZF3_HEADER_SIZE];
+
+        encryptedStream.readFully(ozf3Header);
+
+        DataInputStream dis = new DataInputStream(new ByteArrayInputStream(ozf3Header));
+
+        // skip size field
+        dis.skipBytes(4);
+        width = Integer.reverseBytes(dis.readInt());
+        height = Integer.reverseBytes(dis.readInt());
+        depth = Short.reverseBytes(dis.readShort());
+        bpp = Short.reverseBytes(dis.readShort());
+    }
+
+    private int readImageTableOffset() throws IOException {
+        stream.seek(stream.length() - 4);
+
+        return Integer.reverseBytes(encryptedStream.readInt());
+    }
+
+    private int getEncryptionDepth(byte[] data, int size, byte key) {
+        int encryptionDepth = -1;
+
+        byte[] decompressed = new byte[64 * 64];
+
+        byte[] dataCopy = new byte[size];
+
+        for (int i = 4; i <= size; i++) {
+            System.arraycopy(data, 0, dataCopy, 0, size);
+
+            decrypt(dataCopy, 0, i, key);
+
+            if (decompressTile(decompressed, decompressed.length, dataCopy, size) != -1) {
+                encryptionDepth = i;
+                break;
+            }
+        }
+
+        if (encryptionDepth == size) {
+            encryptionDepth = -1;
+        }
+
+        return encryptionDepth;
+    }
+
+    private int decompressTile(byte[] dest, int destSize, byte[] source, int sourceSize) {
+        Inflater inflater = new Inflater();
+
+        inflater.setInput(source);
+
+        try {
+            return inflater.inflate(dest);
+        }
+        catch (DataFormatException e) {
+            return -1;
         }
     }
 

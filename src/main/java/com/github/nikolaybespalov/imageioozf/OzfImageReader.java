@@ -18,10 +18,12 @@ import java.util.Iterator;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
+import static com.github.nikolaybespalov.imageioozf.OzfEncryptedStream.decrypt;
+
 /**
  * @see <a href="https://trac.osgeo.org/gdal/browser/sandbox/klokan/ozf/ozf-binary-format-description.txt">ozf-binary-format-description.txt</a>
  */
-public final class OzfImageReader extends ImageReader {
+class OzfImageReader extends ImageReader {
     private static final int FILE_HEADER_SIZE = 14;
     private static final int INITIAL_KEY_INDEX = 0x93;
     private static final int OZF3_HEADER_SIZE = 16;
@@ -34,43 +36,32 @@ public final class OzfImageReader extends ImageReader {
     private int bpp;
     private int depth;
 
-    private static final byte abyKey[] = {
-            (byte) 0x2D, (byte) 0x4A, (byte) 0x43, (byte) 0xF1, (byte) 0x27, (byte) 0x9B, (byte) 0x69, (byte) 0x4F,
-            (byte) 0x36, (byte) 0x52, (byte) 0x87, (byte) 0xEC, (byte) 0x5F, (byte) 0x42, (byte) 0x53, (byte) 0x22,
-            (byte) 0x9E, (byte) 0x8B, (byte) 0x2D, (byte) 0x83, (byte) 0x3D, (byte) 0xD2, (byte) 0x84, (byte) 0xBA,
-            (byte) 0xD8, (byte) 0x5B
-    };
-
-    public OzfImageReader(ImageReaderSpi imageReaderSpi) {
+    OzfImageReader(ImageReaderSpi imageReaderSpi) {
         super(imageReaderSpi);
     }
 
     @Override
-    public int getNumImages(boolean allowSearch) throws IOException {
+    public int getNumImages(boolean allowSearch) {
         return 1;
     }
 
     @Override
-    public int getWidth(int i) throws IOException {
+    public int getWidth(int i) {
         return width;
     }
 
     @Override
-    public int getHeight(int i) throws IOException {
+    public int getHeight(int i) {
         return height;
     }
 
     @Override
-    public Iterator<ImageTypeSpecifier> getImageTypes(int i) throws IOException {
+    public Iterator<ImageTypeSpecifier> getImageTypes(int i) {
         ImageTypeSpecifier imageType = null;
         int datatype = DataBuffer.TYPE_BYTE;
         java.util.List<ImageTypeSpecifier> l = new ArrayList<>();
         int colorType = ColorSpace.TYPE_RGB;
         switch (colorType) {
-            case ColorSpace.TYPE_GRAY:
-                imageType = ImageTypeSpecifier.createGrayscale(8, datatype, false);
-                break;
-
             case ColorSpace.TYPE_RGB:
                 ColorSpace rgb = ColorSpace.getInstance(ColorSpace.CS_sRGB);
                 int[] bandOffsets = new int[3];
@@ -245,7 +236,7 @@ public final class OzfImageReader extends ImageReader {
 
             decrypt(dataCopy, 0, i, key);
 
-            if (decompressTile(decompressed, decompressed.length, dataCopy, size) != -1) {
+            if (decompressTile(decompressed, dataCopy) != -1) {
                 encryptionDepth = i;
                 break;
             }
@@ -258,7 +249,7 @@ public final class OzfImageReader extends ImageReader {
         return encryptionDepth;
     }
 
-    private int decompressTile(byte[] dest, int destSize, byte[] source, int sourceSize) {
+    private int decompressTile(byte[] dest, byte[] source) {
         Inflater inflater = new Inflater();
 
         inflater.setInput(source);
@@ -267,12 +258,6 @@ public final class OzfImageReader extends ImageReader {
             return inflater.inflate(dest);
         } catch (DataFormatException e) {
             return -1;
-        }
-    }
-
-    private static void decrypt(byte[] bytes, int offset, int length, byte key) {
-        for (int i = offset; i < length; ++i) {
-            bytes[i] = (byte) (((int) bytes[i] ^ (abyKey[i % abyKey.length] + key)) & 0xFF);
         }
     }
 }

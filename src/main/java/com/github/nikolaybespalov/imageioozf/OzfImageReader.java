@@ -29,7 +29,6 @@ public final class OzfImageReader extends ImageReader {
     private ImageInputStream encryptedStream;
     private boolean isOzf3;
     private byte key;
-    private int keyTableSize;
     private int width;
     private int height;
     private int bpp;

@@ -1,5 +1,6 @@
 package com.github.nikolaybespalov.imageioozf;
 
+import javax.imageio.ImageIO;
 import javax.imageio.ImageReadParam;
 import javax.imageio.ImageReader;
 import javax.imageio.ImageTypeSpecifier;
@@ -7,16 +8,16 @@ import javax.imageio.metadata.IIOMetadata;
 import javax.imageio.spi.ImageReaderSpi;
 import javax.imageio.stream.ImageInputStream;
 import java.awt.*;
+import java.awt.color.ColorSpace;
 import java.awt.image.*;
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
+import java.util.zip.InflaterInputStream;
 
 import static com.github.nikolaybespalov.imageioozf.OzfEncryptedStream.decrypt;
 
@@ -99,12 +100,19 @@ class OzfImageReader extends ImageReader {
             b[i] = (byte) i;
         }
 
-        ColorModel colorModel = new IndexColorModel(8, 256, r, g, b);
+        byte[] colorMap = new byte[1024];
+
+        ColorModel colorModel = new IndexColorModel(8, 256, colorMap, 0, false);
 
         int bitMasks[] = new int[]{(byte) 0xff};
         SampleModel sampleModel = new SinglePixelPackedSampleModel(DataBuffer.TYPE_BYTE, width, height, bitMasks);
 
-        ImageTypeSpecifier imageTypeSpecifier = new ImageTypeSpecifier(colorModel, sampleModel);
+        int[] bandOffset = new int[]{0};
+
+
+        SampleModel sampleModel1 = new PixelInterleavedSampleModel(DataBuffer.TYPE_BYTE, 1, 1, 1, 1, bandOffset);
+
+        ImageTypeSpecifier imageTypeSpecifier = new ImageTypeSpecifier(colorModel, sampleModel1);
 
         java.util.List<ImageTypeSpecifier> imageTypeSpecifiers = new ArrayList<>();
 
@@ -125,13 +133,227 @@ class OzfImageReader extends ImageReader {
         return null;
     }
 
-    @Override
-    public BufferedImage read(int imageIndex, ImageReadParam imageReadParam) {
+    private byte[] getTile(int imageIndex, int x, int y) throws IOException {
         checkImageIndex(imageIndex);
 
-        Rectangle sourceRegion = getSourceRegion(imageReadParam, imageInfos.get(imageIndex).width, imageInfos.get(imageIndex).height);
+        ImageInfo imageInfo = imageInfos.get(imageIndex);
 
-        return null;
+        int i = y * imageInfo.xTiles + x;
+
+        int tileSize = imageInfo.tileOffsetTable[i + 1] - imageInfo.tileOffsetTable[i];
+
+        byte[] tile = new byte[tileSize];
+
+        stream.seek(imageInfo.tileOffsetTable[imageIndex]);
+        stream.readFully(tile);
+
+        if (imageInfo.encryptionDepth == -1) {
+            decrypt(tile, 0, tileSize, key);
+        } else {
+            decrypt(tile, 0, imageInfo.encryptionDepth, key);
+        }
+
+        byte[] decompressed = new byte[64 * 64];
+
+        int n = decompressTile(decompressed, tile);
+
+        if (n == -1) {
+            return null;
+        }
+
+        return decompressed;
+    }
+
+    @Override
+    public BufferedImage read(int imageIndex, ImageReadParam param) throws IOException {
+        checkImageIndex(imageIndex);
+
+
+        ImageInfo imageInfo = imageInfos.get(imageIndex);
+
+        byte[] tile = getTile(1, 2, 5);
+
+        byte[] asd = new byte[64 * 64 * 4];
+
+        for (int j = 0; j < 64 * 64; ++j) {
+            int c = tile[j];
+
+            // flipping image vertical
+            int tile_y = (64 - 1) - (j / 64);
+            int tile_x = j % 64;
+            int tile_z = tile_y * 64 + tile_x;
+
+            byte r = imageInfo.palette[c*4 + 2];
+            byte g = imageInfo.palette[c*4 + 1];
+            byte b = imageInfo.palette[c*4 + 0];
+            byte a = (byte) 255;
+
+            // applying bgr -> rgba
+            asd[tile_z * 4 + 0] = r; // r
+            asd[tile_z * 4 + 1] = g; // g
+            asd[tile_z * 4 + 2] = b; // b
+            asd[tile_z * 4 + 3] = a; // a
+        }
+
+        DataBuffer buffer = new DataBufferByte(asd, 64*64*4);
+
+        int pixelStride = 4; //assuming r, g, b, skip, r, g, b, skip...
+        int scanlineStride = 4*64; //no extra padding
+        int[] bandOffsets = {0, 1, 2}; //r, g, b
+        WritableRaster raster = Raster.createInterleavedRaster(buffer, 64, 64, scanlineStride, pixelStride, bandOffsets, null);
+        ColorSpace colorSpace = ColorSpace.getInstance(ColorSpace.CS_sRGB);
+        boolean hasAlpha = false;
+        boolean isAlphaPremultiplied = false;
+        int transparency = Transparency.OPAQUE;
+        int transferType = DataBuffer.TYPE_BYTE;
+        ColorModel colorModel = new ComponentColorModel(colorSpace, hasAlpha, isAlphaPremultiplied, transparency, transferType);
+
+        BufferedImage r = new BufferedImage(colorModel, raster, isAlphaPremultiplied, null);
+
+        return r;
+
+//        DataBuffer buffer = new DataBufferByte(tile, 64 * 64);
+//
+//        ColorModel cm = getImageTypes(0).next().getColorModel();
+//        WritableRaster raster = cm.createCompatibleWritableRaster(64, 64);
+//
+//        //raster.setDataElements(0, 0, 64, 64, buffer);
+//
+//        WritableRaster raster1 = Raster.createInterleavedRaster(
+//                new DataBufferByte(tile, tile.length),
+//                64,
+//                64,
+//                64,
+//                1,
+//                new int[]{0},
+//                null);
+//
+//        int pixelStride = 1; //assuming r, g, b, skip, r, g, b, skip...
+//        int scanlineStride = 1 * 64; //no extra padding
+//        int[] bandOffsets = {0}; //r, g, b
+//        //WritableRaster raster = Raster.createInterleavedRaster(buffer, 64, 64, scanlineStride, pixelStride, bandOffsets, null);
+//
+//
+//        BufferedImage image = new BufferedImage(cm, raster1, true, null);
+//
+//        ImageIO.write(image, "png", new File("D:/test.png"));
+//
+//        return image;
+
+//        // Compute initial source region, clip against destination later
+//        Rectangle sourceRegion = getSourceRegion(param, width, height);
+//
+//        // Set everything to default values
+//        int sourceXSubsampling = 1;
+//        int sourceYSubsampling = 1;
+//        int[] sourceBands = null;
+//        int[] destinationBands = null;
+//        Point destinationOffset = new Point(0, 0);
+//
+//        // Get values from the ImageReadParam, if any
+//        if (param != null) {
+//            sourceXSubsampling = param.getSourceXSubsampling();
+//            sourceYSubsampling = param.getSourceYSubsampling();
+//            sourceBands = param.getSourceBands();
+//            destinationBands = param.getDestinationBands();
+//            destinationOffset = param.getDestinationOffset();
+//        }
+//
+//        // Get the specified detination image or create a new one
+//        BufferedImage dst = getDestination(param, getImageTypes(0), width, height);
+//        // Enure band settings from param are compatible with images
+//        int inputBands = 1;
+//        checkReadParamBandSettings(param, inputBands, dst.getSampleModel().getNumBands());
+//
+//        int[] bandOffsets = new int[inputBands];
+//        for (int i = 0; i < inputBands; i++) {
+//            bandOffsets[i] = i;
+//        }
+//        int bytesPerRow = width * inputBands;
+//        DataBufferByte rowDB = new DataBufferByte(bytesPerRow);
+//        WritableRaster rowRas =
+//                Raster.createInterleavedRaster(rowDB,
+//                        width, 1, bytesPerRow,
+//                        inputBands, bandOffsets,
+//                        new Point(0, 0));
+//        byte[] rowBuf = rowDB.getData();
+//
+//        // Create an int[] that can a single pixel
+//        int[] pixel = rowRas.getPixel(0, 0, (int[]) null);
+//
+//        WritableRaster imRas = dst.getWritableTile(0, 0);
+//        int dstMinX = imRas.getMinX();
+//        int dstMaxX = dstMinX + imRas.getWidth() - 1;
+//        int dstMinY = imRas.getMinY();
+//        int dstMaxY = dstMinY + imRas.getHeight() - 1;
+//
+//        // Create a child raster exposing only the desired source bands
+//        if (sourceBands != null) {
+//            rowRas = rowRas.createWritableChild(0, 0,
+//                    width, 1,
+//                    0, 0,
+//                    sourceBands);
+//        }
+//
+//        // Create a child raster exposing only the desired dest bands
+//        if (destinationBands != null) {
+//            imRas = imRas.createWritableChild(0, 0,
+//                    imRas.getWidth(),
+//                    imRas.getHeight(),
+//                    0, 0,
+//                    destinationBands);
+//        }
+//
+//        for (int srcY = 0; srcY < height; srcY++) {
+//            // Read the row
+////            try {
+////                stream.readFully(rowBuf);
+////            } catch (IOException e) {
+////                throw new IIOException("Error reading line " + srcY, e);
+////            }
+//
+//            // Reject rows that lie outside the source region,
+//            // or which aren't part of the subsampling
+//            if ((srcY < sourceRegion.y) ||
+//                    (srcY >= sourceRegion.y + sourceRegion.height) ||
+//                    (((srcY - sourceRegion.y) %
+//                            sourceYSubsampling) != 0)) {
+//                continue;
+//            }
+//
+//            // Determine where the row will go in the destination
+//            int dstY = destinationOffset.y +
+//                    (srcY - sourceRegion.y) / sourceYSubsampling;
+//            if (dstY < dstMinY) {
+//                continue; // The row is above imRas
+//            }
+//            if (dstY > dstMaxY) {
+//                break; // We're done with the image
+//            }
+//
+//            // Copy each (subsampled) source pixel into imRas
+//            for (int srcX = sourceRegion.x;
+//                 srcX < sourceRegion.x + sourceRegion.width;
+//                 srcX++) {
+//                if (((srcX - sourceRegion.x) % sourceXSubsampling) != 0) {
+//                    continue;
+//                }
+//                int dstX = destinationOffset.x +
+//                        (srcX - sourceRegion.x) / sourceXSubsampling;
+//                if (dstX < dstMinX) {
+//                    continue;  // The pixel is to the left of imRas
+//                }
+//                if (dstX > dstMaxX) {
+//                    break; // We're done with the row
+//                }
+//
+//                // Copy the pixel, sub-banding is done automatically
+//                rowRas.getPixel(srcX, 0, pixel);
+//                imRas.setPixel(dstX, dstY, pixel);
+//            }
+//        }
+//
+//        return dst;
     }
 
     @Override
@@ -292,15 +514,33 @@ class OzfImageReader extends ImageReader {
     }
 
     private int decompressTile(byte[] dest, byte[] source) {
-        Inflater inflater = new Inflater();
-
-        inflater.setInput(source);
+        InputStream inf = new InflaterInputStream(new ByteArrayInputStream(source));
 
         try {
-            return inflater.inflate(dest);
-        } catch (DataFormatException e) {
+            int n = inf.read(dest);
+
+            return n;
+        }
+        catch (IOException e) {
             return -1;
         }
+
+//        ByteArrayOutputStream outputStream = new ByteArrayOutputStream(dest.length);
+//
+//        byte[] buffer = new byte[1024];
+//
+//        Inflater inflater = new Inflater();
+//
+//
+//
+//        inflater.setInput(source);
+//
+//        try {
+//            return inflater.inflate(dest);
+//        }
+//        catch (DataFormatException e) {
+//            return -1;
+//        }
     }
 
     private void checkImageIndex(int imageIndex) {

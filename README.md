@@ -6,7 +6,7 @@ It's as easy as reading any other image file
     BufferedImage ozfImage = ImageIO.read(new File("image.ozf3"));
     
 Just add dependency to your _pom.xml_
-
+```xml
     <dependency>
         <groupId>com.github.nikolaybespalov</groupId>
         <artifactId>imageio-ozf</artifactId>
@@ -15,11 +15,9 @@ Just add dependency to your _pom.xml_
     </dependency>
     
 Or to your _build.gradle_
-
+```
     dependencies {
-        ...
         runtime("com.github.nikolaybespalov:imageio-ozf:{imageio.ozf.version}")
-        ...
     }
 
 And your project will be able to work with .ozf files!

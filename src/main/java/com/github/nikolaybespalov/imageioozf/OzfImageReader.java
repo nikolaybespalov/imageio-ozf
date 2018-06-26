@@ -6,9 +6,8 @@ import javax.imageio.ImageTypeSpecifier;
 import javax.imageio.metadata.IIOMetadata;
 import javax.imageio.spi.ImageReaderSpi;
 import javax.imageio.stream.ImageInputStream;
-import java.awt.color.ColorSpace;
-import java.awt.image.BufferedImage;
-import java.awt.image.DataBuffer;
+import java.awt.*;
+import java.awt.image.*;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -22,12 +21,15 @@ import java.util.zip.Inflater;
 import static com.github.nikolaybespalov.imageioozf.OzfEncryptedStream.decrypt;
 
 /**
+ * https://docs.oracle.com/javase/8/docs/technotes/guides/imageio/spec/imageio_guideTOC.fm.html
+ *
  * @see <a href="https://trac.osgeo.org/gdal/browser/sandbox/klokan/ozf/ozf-binary-format-description.txt">ozf-binary-format-description.txt</a>
  */
 class OzfImageReader extends ImageReader {
     private static final int FILE_HEADER_SIZE = 14;
     private static final int INITIAL_KEY_INDEX = 0x93;
     private static final int OZF3_HEADER_SIZE = 16;
+    private static final int THUMBNAILS = 2;
     private ImageInputStream stream;
     private ImageInputStream encryptedStream;
     private boolean isOzf3;
@@ -66,37 +68,49 @@ class OzfImageReader extends ImageReader {
 
     @Override
     public int getNumImages(boolean allowSearch) {
-        return imageInfos.size() - 2;
+        return imageInfos.size() - THUMBNAILS;
     }
 
     @Override
-    public int getWidth(int i) {
-        return width;
+    public int getWidth(int imageIndex) {
+        checkImageIndex(imageIndex);
+
+        return imageInfos.get(imageIndex).width;
     }
 
     @Override
-    public int getHeight(int i) {
-        return height;
+    public int getHeight(int imageIndex) {
+        checkImageIndex(imageIndex);
+
+        return imageInfos.get(imageIndex).height;
     }
 
     @Override
-    public Iterator<ImageTypeSpecifier> getImageTypes(int i) {
-        ImageTypeSpecifier imageType = null;
-        int datatype = DataBuffer.TYPE_BYTE;
-        java.util.List<ImageTypeSpecifier> l = new ArrayList<>();
-        int colorType = ColorSpace.TYPE_RGB;
-        switch (colorType) {
-            case ColorSpace.TYPE_RGB:
-                ColorSpace rgb = ColorSpace.getInstance(ColorSpace.CS_sRGB);
-                int[] bandOffsets = new int[3];
-                bandOffsets[0] = 0;
-                bandOffsets[1] = 1;
-                bandOffsets[2] = 2;
-                imageType = ImageTypeSpecifier.createInterleaved(rgb, bandOffsets, datatype, false, false);
-                break;
+    public Iterator<ImageTypeSpecifier> getImageTypes(int imageIndex) {
+        checkImageIndex(imageIndex);
+
+        byte[] r = new byte[256];
+        byte[] g = new byte[256];
+        byte[] b = new byte[256];
+
+        for (int i = 0; i < 256; i++) {
+            r[i] = (byte) i;
+            g[i] = (byte) i;
+            b[i] = (byte) i;
         }
-        l.add(imageType);
-        return l.iterator();
+
+        ColorModel colorModel = new IndexColorModel(8, 256, r, g, b);
+
+        int bitMasks[] = new int[]{(byte) 0xff};
+        SampleModel sampleModel = new SinglePixelPackedSampleModel(DataBuffer.TYPE_BYTE, width, height, bitMasks);
+
+        ImageTypeSpecifier imageTypeSpecifier = new ImageTypeSpecifier(colorModel, sampleModel);
+
+        java.util.List<ImageTypeSpecifier> imageTypeSpecifiers = new ArrayList<>();
+
+        imageTypeSpecifiers.add(imageTypeSpecifier);
+
+        return imageTypeSpecifiers.iterator();
     }
 
     @Override
@@ -105,12 +119,18 @@ class OzfImageReader extends ImageReader {
     }
 
     @Override
-    public IIOMetadata getImageMetadata(int i) {
+    public IIOMetadata getImageMetadata(int imageIndex) {
+        checkImageIndex(imageIndex);
+
         return null;
     }
 
     @Override
-    public BufferedImage read(int i, ImageReadParam imageReadParam) {
+    public BufferedImage read(int imageIndex, ImageReadParam imageReadParam) {
+        checkImageIndex(imageIndex);
+
+        Rectangle sourceRegion = getSourceRegion(imageReadParam, imageInfos.get(imageIndex).width, imageInfos.get(imageIndex).height);
+
         return null;
     }
 
@@ -136,7 +156,7 @@ class OzfImageReader extends ImageReader {
                 int keyTableSize = keyTable.length;
 
                 if (keyTableSize < INITIAL_KEY_INDEX + 1) {
-                    throw new IOException("Too few data");
+                    throw new IOException("too few data!");
                 }
 
                 byte initialKey = keyTable[INITIAL_KEY_INDEX];
@@ -280,6 +300,12 @@ class OzfImageReader extends ImageReader {
             return inflater.inflate(dest);
         } catch (DataFormatException e) {
             return -1;
+        }
+    }
+
+    private void checkImageIndex(int imageIndex) {
+        if (imageIndex < 0 || imageIndex >= imageInfos.size() - THUMBNAILS) {
+            throw new IndexOutOfBoundsException("bad index!");
         }
     }
 }

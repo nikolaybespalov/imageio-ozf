@@ -1,5 +1,4 @@
 language: java
 install: true
 script:
- - mvn package
- - mvn com.gavinmogan:codacy-maven-plugin:coverage -DcoverageReportFile=target/coverage-reports/jacoco/jacoco.xml
+ - mvn package && mvn com.gavinmogan:codacy-maven-plugin:coverage -DcoverageReportFile=target/coverage-reports/jacoco/jacoco.xml

@@ -1,5 +1,8 @@
 package com.github.nikolaybespalov.imageioozf;
 
+import com.google.common.io.Files;
+import com.google.common.io.Resources;
+import org.apache.commons.io.FileUtils;
 import org.junit.Test;
 
 import javax.imageio.ImageReader;
@@ -18,7 +21,7 @@ public class OzfImageReaderTest {
      */
     @Test
     public void testWorld() throws IOException {
-        try (ImageInputStream is = new FileImageInputStream(new File("C:\\Users\\Nikolay Bespalov\\Documents\\github.com\\nikolaybespalov\\imageio-ozf\\src\\test\\resources\\World.ozf2"))) {
+        try (ImageInputStream is = new FileImageInputStream(FileUtils.toFile(Resources.getResource("World.ozf2")))) {
             ImageReader reader = new OzfImageReader(null);
 
             reader.setInput(is);

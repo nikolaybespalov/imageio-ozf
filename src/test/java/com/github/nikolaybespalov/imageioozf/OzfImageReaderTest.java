@@ -10,7 +10,6 @@ import javax.imageio.stream.ImageInputStream;
 import java.io.IOException;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 public class OzfImageReaderTest {
 
@@ -26,8 +25,7 @@ public class OzfImageReaderTest {
 
             assertEquals(2108, reader.getWidth(0));
             assertEquals(2048, reader.getHeight(0));
-            assertEquals(1, reader.getNumImages(false));
+            assertEquals(5, reader.getNumImages(false));
         }
-        assertTrue(true);
     }
 }

@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
@@ -33,8 +34,31 @@ class OzfImageReader extends ImageReader {
     private byte key;
     private int width;
     private int height;
-    private int bpp;
-    private int depth;
+    //private int bpp;
+    //private int depth;
+    private List<ImageInfo> imageInfos = new ArrayList<>();
+
+    class ImageInfo {
+        final int offset;
+        final int width;
+        final int height;
+        final int xTiles;
+        final int yTiles;
+        final byte[] palette;
+        final int[] tileOffsetTable;
+        final int encryptionDepth;
+
+        ImageInfo(int offset, int width, int height, int xTiles, int yTiles, byte[] palette, int[] tileOffsetTable, int encryptionDepth) {
+            this.offset = offset;
+            this.width = width;
+            this.height = height;
+            this.xTiles = xTiles;
+            this.yTiles = yTiles;
+            this.palette = palette;
+            this.tileOffsetTable = tileOffsetTable;
+            this.encryptionDepth = encryptionDepth;
+        }
+    }
 
     OzfImageReader(ImageReaderSpi imageReaderSpi) {
         super(imageReaderSpi);
@@ -42,7 +66,7 @@ class OzfImageReader extends ImageReader {
 
     @Override
     public int getNumImages(boolean allowSearch) {
-        return 1;
+        return imageInfos.size() - 2;
     }
 
     @Override
@@ -76,17 +100,17 @@ class OzfImageReader extends ImageReader {
     }
 
     @Override
-    public IIOMetadata getStreamMetadata() throws IOException {
+    public IIOMetadata getStreamMetadata() {
         return null;
     }
 
     @Override
-    public IIOMetadata getImageMetadata(int i) throws IOException {
+    public IIOMetadata getImageMetadata(int i) {
         return null;
     }
 
     @Override
-    public BufferedImage read(int i, ImageReadParam imageReadParam) throws IOException {
+    public BufferedImage read(int i, ImageReadParam imageReadParam) {
         return null;
     }
 
@@ -131,14 +155,14 @@ class OzfImageReader extends ImageReader {
 
                 stream.seek(imageTableOffset);
 
-                int[] imageOffsets = new int[images];
+                int[] imageOffsetTable = new int[images];
 
                 for (int imageIndex = 0; imageIndex < images; imageIndex++) {
-                    imageOffsets[imageIndex] = Integer.reverseBytes(encryptedStream.readInt());
+                    imageOffsetTable[imageIndex] = Integer.reverseBytes(encryptedStream.readInt());
                 }
 
                 for (int imageIndex = 0; imageIndex < images; imageIndex++) {
-                    int imageOffset = imageOffsets[imageIndex];
+                    int imageOffset = imageOffsetTable[imageIndex];
 
                     stream.seek(imageOffset);
 
@@ -151,15 +175,15 @@ class OzfImageReader extends ImageReader {
 
                     int tiles = xTiles * xyTiles + 1;
 
-                    int[] tileOffsets = new int[tiles];
+                    int[] tileOffsetTable = new int[tiles];
 
                     for (int tileIndex = 0; tileIndex < tiles; tileIndex++) {
-                        tileOffsets[tileIndex] = Integer.reverseBytes(encryptedStream.readInt());
+                        tileOffsetTable[tileIndex] = Integer.reverseBytes(encryptedStream.readInt());
                     }
 
-                    int tileSize = tileOffsets[1] - tileOffsets[0];
+                    int tileSize = tileOffsetTable[1] - tileOffsetTable[0];
 
-                    stream.seek(tileOffsets[0]);
+                    stream.seek(tileOffsetTable[0]);
 
                     byte[] tile = new byte[tileSize];
 
@@ -167,14 +191,12 @@ class OzfImageReader extends ImageReader {
 
                     int encryptionDepth = getEncryptionDepth(tile, tileSize, key);
 
-                    int asd = 0;
-                    int asdf = asd;
+                    imageInfos.add(new ImageInfo(imageOffset, width, height, xTiles, xyTiles, palette, tileOffsetTable, encryptionDepth));
                 }
             }
         } catch (IOException e) {
             throw new IllegalArgumentException(e);
         }
-
     }
 
     private byte[] readFileHeader() throws IOException {
@@ -214,8 +236,8 @@ class OzfImageReader extends ImageReader {
         dis.skipBytes(4);
         width = Integer.reverseBytes(dis.readInt());
         height = Integer.reverseBytes(dis.readInt());
-        depth = Short.reverseBytes(dis.readShort());
-        bpp = Short.reverseBytes(dis.readShort());
+//        depth = Short.reverseBytes(dis.readShort());
+//        bpp = Short.reverseBytes(dis.readShort());
     }
 
     private int readImageTableOffset() throws IOException {

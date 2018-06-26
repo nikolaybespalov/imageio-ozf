@@ -1,8 +1,5 @@
 package com.github.nikolaybespalov.imageioozf;
 
-import com.google.common.primitives.Ints;
-import com.google.common.primitives.Shorts;
-
 import javax.imageio.ImageReadParam;
 import javax.imageio.ImageReader;
 import javax.imageio.ImageTypeSpecifier;
@@ -13,14 +10,12 @@ import java.awt.color.ColorSpace;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBuffer;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.zip.DataFormatException;
-import java.util.zip.Deflater;
 import java.util.zip.Inflater;
 
 /**
@@ -271,18 +266,9 @@ public final class OzfImageReader extends ImageReader {
 
         try {
             return inflater.inflate(dest);
-        }
-        catch (DataFormatException e) {
+        } catch (DataFormatException e) {
             return -1;
         }
-    }
-
-    private static int readInt(byte[] bytes, int offset) {
-        return Ints.fromBytes(bytes[3 + offset], bytes[2 + offset], bytes[1 + offset], bytes[offset]);
-    }
-
-    private static short readShort(byte[] bytes, int offset) {
-        return Shorts.fromBytes(bytes[1 + offset], bytes[offset]);
     }
 
     private static void decrypt(byte[] bytes, int offset, int length, byte key) {

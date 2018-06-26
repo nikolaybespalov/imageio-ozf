@@ -18,7 +18,7 @@ Or to your _build.gradle_
 
     dependencies {
         ...
-        runtime("com.github.nikolaybespalov:jul4nt:{jul4nt.version}")
+        runtime("com.github.nikolaybespalov:imageio-ozf:{imageio.ozf.version}")
         ...
     }
 

@@ -13,9 +13,9 @@ Just add dependency to your _pom.xml_
         <version>${imageio.ozf.version}</version>
         <scope>runtime</scope>
     </dependency>
-    
+
 Or to your _build.gradle_
-```
+```js
     dependencies {
         runtime("com.github.nikolaybespalov:imageio-ozf:{imageio.ozf.version}")
     }

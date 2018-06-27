@@ -1,16 +1,16 @@
 package com.github.nikolaybespalov.imageioozf;
 
+import org.apache.commons.io.IOUtils;
+
 import javax.imageio.ImageReadParam;
 import javax.imageio.ImageReader;
 import javax.imageio.ImageTypeSpecifier;
 import javax.imageio.metadata.IIOMetadata;
 import javax.imageio.spi.ImageReaderSpi;
 import javax.imageio.stream.ImageInputStream;
+import java.awt.*;
 import java.awt.image.*;
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -50,6 +50,7 @@ class OzfImageReader extends ImageReader {
         final byte[] palette; // B(0)G(1)R(2)_(3)
         final int[] tileOffsetTable;
         final int encryptionDepth;
+        final ColorModel cm;
 
         ImageInfo(int offset, int width, int height, int xTiles, int yTiles, byte[] palette, int[] tileOffsetTable, int encryptionDepth) {
             this.offset = offset;
@@ -60,6 +61,18 @@ class OzfImageReader extends ImageReader {
             this.palette = palette;
             this.tileOffsetTable = tileOffsetTable;
             this.encryptionDepth = encryptionDepth;
+
+            byte[] r = new byte[256];
+            byte[] g = new byte[256];
+            byte[] b = new byte[256];
+
+            for (int i = 0; i < 256; i++) {
+                r[i] = palette[i * 4 + 2];
+                g[i] = palette[i * 4 + 1];
+                b[i] = palette[i * 4];
+            }
+
+            this.cm = new IndexColorModel(8, 256, r, g, b);
         }
     }
 
@@ -92,22 +105,10 @@ class OzfImageReader extends ImageReader {
 
         ImageInfo imageInfo = imageInfos.get(imageIndex);
 
-        byte[] r = new byte[256];
-        byte[] g = new byte[256];
-        byte[] b = new byte[256];
-
-        for (int i = 0; i < 256; i++) {
-            r[i] = imageInfo.palette[i * 4 + 2];
-            g[i] = imageInfo.palette[i * 4 + 1];
-            b[i] = imageInfo.palette[i * 4];
-        }
-
-        ColorModel cm = new IndexColorModel(8, 256, r, g, b);
-
         int[] bandOffset = new int[]{0};
         SampleModel sm = new PixelInterleavedSampleModel(DataBuffer.TYPE_BYTE, 1, 1, 1, 1, bandOffset);
 
-        ImageTypeSpecifier imageTypeSpecifier = new ImageTypeSpecifier(cm, sm);
+        ImageTypeSpecifier imageTypeSpecifier = new ImageTypeSpecifier(imageInfo.cm, sm);
 
         java.util.List<ImageTypeSpecifier> imageTypeSpecifiers = new ArrayList<>();
 
@@ -133,11 +134,107 @@ class OzfImageReader extends ImageReader {
     public BufferedImage read(int imageIndex, ImageReadParam param) throws IOException {
         checkImageIndex(imageIndex);
 
-        return readTile(imageIndex, 0, 7);
+        // Compute initial source region, clip against destination later
+        Rectangle sourceRegion = getSourceRegion(param, getWidth(imageIndex), getHeight(imageIndex));
 
-//        // Compute initial source region, clip against destination later
-//        Rectangle sourceRegion = getSourceRegion(param, width, height);
-//
+        byte[] result = new byte[sourceRegion.width * sourceRegion.height];
+
+        int xTiles = (sourceRegion.x + sourceRegion.width + OZF_TILE_WIDTH - 1) / OZF_TILE_WIDTH;
+        int yTiles = (sourceRegion.y + sourceRegion.height + OZF_TILE_HEIGHT - 1) / OZF_TILE_HEIGHT;
+
+        int xTileIndex = sourceRegion.x / OZF_TILE_WIDTH;
+        int yTileIndex = sourceRegion.y / OZF_TILE_HEIGHT;
+
+        int x1 = sourceRegion.x;
+        int y1 = sourceRegion.y;
+
+        int x2 = sourceRegion.x + sourceRegion.width;
+        int y2 = sourceRegion.y + sourceRegion.height;
+
+        int w = sourceRegion.width;
+
+        for (int y = yTileIndex; y < yTiles; y++) {
+            for (int x = xTileIndex; x < xTiles; x++) {
+                byte[] tile = getTile(imageIndex, x, y);
+
+                int a = x * 64;
+                int b = y * 64;
+                int c = (x + 1) * 64;
+                int d = (y + 1) * 64;
+
+                int tx1;
+                int tx2;
+                int ix1;
+                int ix2;
+
+                if (a < x1) {
+                    tx1 = x1 - a;
+                    ix1 = 0;
+                } else {
+                    tx1 = 0;
+                    ix1 = a - x1;
+                }
+
+                if (x2 < c) {
+                    tx2 = 64 - (c - x2);
+                    ix2 = sourceRegion.width;
+                } else {
+                    tx2 = 64;
+                    ix2 = c - x1;
+                }
+
+                int ty1;
+                int ty2;
+                int iy1;
+                int iy2;
+
+                if (b < y1) {
+                    ty1 = y1 - b;
+                    iy1 = 0;
+                } else {
+                    ty1 = 0;
+                    iy1 = b - y1;
+                }
+
+                if (y2 < d) {
+                    ty2 = 64 - (d - x2);
+                    iy2 = sourceRegion.height;
+                } else {
+                    ty2 = 64;
+                    iy2 = d - y1;
+                }
+
+                BufferedImage ttt = readTile(imageIndex, x, y);
+
+                assert (ix2 - ix1) == (tx2 - tx1);
+
+                for (int i = ty1, j = 0; i < ty2; i++, j++) {
+                    System.arraycopy(tile, i * 64 + tx1, result, (iy1 + j) * w + ix1, (tx2 - tx1));
+                }
+            }
+        }
+
+        Iterator<ImageTypeSpecifier> it = getImageTypes(imageIndex);
+
+        if (!it.hasNext()) {
+            throw new IllegalArgumentException("bad iterator!");
+        }
+
+        ImageTypeSpecifier its = it.next();
+
+        ColorModel cm = its.getColorModel();
+        SampleModel sm = its.getSampleModel(sourceRegion.width, sourceRegion.height);
+
+        //byte[] tileData = getTile(imageIndex, x, y);
+
+        DataBuffer tileDataBuffer = new DataBufferByte(result, sourceRegion.width * sourceRegion.height);
+
+        WritableRaster writableRaster = Raster.createWritableRaster(sm, tileDataBuffer, null);
+
+        BufferedImage image = new BufferedImage(cm, writableRaster, false, null);
+
+        return image;
+
 //        // Set everything to default values
 //        int sourceXSubsampling = 1;
 //        int sourceYSubsampling = 1;
@@ -154,9 +251,9 @@ class OzfImageReader extends ImageReader {
 //            destinationOffset = param.getDestinationOffset();
 //        }
 //
-//        // Get the specified detination image or create a new one
-//        BufferedImage dst = getDestination(param, getImageTypes(0), width, height);
-//        // Enure band settings from param are compatible with images
+//        // Get the specified destination image or create a new one
+//        BufferedImage dst = getDestination(param, getImageTypes(imageIndex), getWidth(imageIndex), getHeight(imageIndex));
+//        // Ensure band settings from param are compatible with images
 //        int inputBands = 1;
 //        checkReadParamBandSettings(param, inputBands, dst.getSampleModel().getNumBands());
 //
@@ -164,11 +261,11 @@ class OzfImageReader extends ImageReader {
 //        for (int i = 0; i < inputBands; i++) {
 //            bandOffsets[i] = i;
 //        }
-//        int bytesPerRow = width * inputBands;
+//        int bytesPerRow = getWidth(imageIndex) * inputBands;
 //        DataBufferByte rowDB = new DataBufferByte(bytesPerRow);
 //        WritableRaster rowRas =
 //                Raster.createInterleavedRaster(rowDB,
-//                        width, 1, bytesPerRow,
+//                        getWidth(imageIndex), 1, bytesPerRow,
 //                        inputBands, bandOffsets,
 //                        new Point(0, 0));
 //        byte[] rowBuf = rowDB.getData();
@@ -249,6 +346,8 @@ class OzfImageReader extends ImageReader {
 //        }
 //
 //        return dst;
+
+        //return readTile(imageIndex, 0, 7);
     }
 
     @Override
@@ -411,8 +510,15 @@ class OzfImageReader extends ImageReader {
     private int decompressTile(byte[] dest, byte[] source) {
         InputStream inf = new InflaterInputStream(new ByteArrayInputStream(source));
 
+        ByteArrayOutputStream bas = new ByteArrayOutputStream(10000);
+
         try {
-            return inf.read(dest);
+            int n = IOUtils.copy(inf, bas);
+
+            System.arraycopy(bas.toByteArray(), 0, dest, 0, 4096);
+
+            return n;
+            //return inf.read(dest);
         } catch (IOException e) {
             return -1;
         }

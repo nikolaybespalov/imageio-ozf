@@ -1,22 +1,20 @@
 package com.github.nikolaybespalov.imageioozf;
 
-import javax.imageio.ImageIO;
 import javax.imageio.ImageReadParam;
 import javax.imageio.ImageReader;
 import javax.imageio.ImageTypeSpecifier;
 import javax.imageio.metadata.IIOMetadata;
 import javax.imageio.spi.ImageReaderSpi;
 import javax.imageio.stream.ImageInputStream;
-import java.awt.*;
-import java.awt.color.ColorSpace;
 import java.awt.image.*;
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.zip.DataFormatException;
-import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
 
 import static com.github.nikolaybespalov.imageioozf.OzfEncryptedStream.decrypt;
@@ -31,6 +29,8 @@ class OzfImageReader extends ImageReader {
     private static final int INITIAL_KEY_INDEX = 0x93;
     private static final int OZF3_HEADER_SIZE = 16;
     private static final int THUMBNAILS = 2;
+    private static final int OZF_TILE_WIDTH = 64;
+    private static final int OZF_TILE_HEIGHT = 64;
     private ImageInputStream stream;
     private ImageInputStream encryptedStream;
     private boolean isOzf3;
@@ -47,7 +47,7 @@ class OzfImageReader extends ImageReader {
         final int height;
         final int xTiles;
         final int yTiles;
-        final byte[] palette;
+        final byte[] palette; // B(0)G(1)R(2)_(3)
         final int[] tileOffsetTable;
         final int encryptionDepth;
 
@@ -90,29 +90,24 @@ class OzfImageReader extends ImageReader {
     public Iterator<ImageTypeSpecifier> getImageTypes(int imageIndex) {
         checkImageIndex(imageIndex);
 
+        ImageInfo imageInfo = imageInfos.get(imageIndex);
+
         byte[] r = new byte[256];
         byte[] g = new byte[256];
         byte[] b = new byte[256];
 
         for (int i = 0; i < 256; i++) {
-            r[i] = (byte) i;
-            g[i] = (byte) i;
-            b[i] = (byte) i;
+            r[i] = imageInfo.palette[i * 4 + 2];
+            g[i] = imageInfo.palette[i * 4 + 1];
+            b[i] = imageInfo.palette[i * 4];
         }
 
-        byte[] colorMap = new byte[1024];
-
-        ColorModel colorModel = new IndexColorModel(8, 256, colorMap, 0, false);
-
-        int bitMasks[] = new int[]{(byte) 0xff};
-        SampleModel sampleModel = new SinglePixelPackedSampleModel(DataBuffer.TYPE_BYTE, width, height, bitMasks);
+        ColorModel cm = new IndexColorModel(8, 256, r, g, b);
 
         int[] bandOffset = new int[]{0};
+        SampleModel sm = new PixelInterleavedSampleModel(DataBuffer.TYPE_BYTE, 1, 1, 1, 1, bandOffset);
 
-
-        SampleModel sampleModel1 = new PixelInterleavedSampleModel(DataBuffer.TYPE_BYTE, 1, 1, 1, 1, bandOffset);
-
-        ImageTypeSpecifier imageTypeSpecifier = new ImageTypeSpecifier(colorModel, sampleModel1);
+        ImageTypeSpecifier imageTypeSpecifier = new ImageTypeSpecifier(cm, sm);
 
         java.util.List<ImageTypeSpecifier> imageTypeSpecifiers = new ArrayList<>();
 
@@ -133,112 +128,12 @@ class OzfImageReader extends ImageReader {
         return null;
     }
 
-    private byte[] getTile(int imageIndex, int x, int y) throws IOException {
-        checkImageIndex(imageIndex);
-
-        ImageInfo imageInfo = imageInfos.get(imageIndex);
-
-        int i = y * imageInfo.xTiles + x;
-
-        int tileSize = imageInfo.tileOffsetTable[i + 1] - imageInfo.tileOffsetTable[i];
-
-        byte[] tile = new byte[tileSize];
-
-        stream.seek(imageInfo.tileOffsetTable[imageIndex]);
-        stream.readFully(tile);
-
-        if (imageInfo.encryptionDepth == -1) {
-            decrypt(tile, 0, tileSize, key);
-        } else {
-            decrypt(tile, 0, imageInfo.encryptionDepth, key);
-        }
-
-        byte[] decompressed = new byte[64 * 64];
-
-        int n = decompressTile(decompressed, tile);
-
-        if (n == -1) {
-            return null;
-        }
-
-        return decompressed;
-    }
 
     @Override
     public BufferedImage read(int imageIndex, ImageReadParam param) throws IOException {
         checkImageIndex(imageIndex);
 
-
-        ImageInfo imageInfo = imageInfos.get(imageIndex);
-
-        byte[] tile = getTile(1, 2, 5);
-
-        byte[] asd = new byte[64 * 64 * 4];
-
-        for (int j = 0; j < 64 * 64; ++j) {
-            int c = tile[j];
-
-            // flipping image vertical
-            int tile_y = (64 - 1) - (j / 64);
-            int tile_x = j % 64;
-            int tile_z = tile_y * 64 + tile_x;
-
-            byte r = imageInfo.palette[c*4 + 2];
-            byte g = imageInfo.palette[c*4 + 1];
-            byte b = imageInfo.palette[c*4 + 0];
-            byte a = (byte) 255;
-
-            // applying bgr -> rgba
-            asd[tile_z * 4 + 0] = r; // r
-            asd[tile_z * 4 + 1] = g; // g
-            asd[tile_z * 4 + 2] = b; // b
-            asd[tile_z * 4 + 3] = a; // a
-        }
-
-        DataBuffer buffer = new DataBufferByte(asd, 64*64*4);
-
-        int pixelStride = 4; //assuming r, g, b, skip, r, g, b, skip...
-        int scanlineStride = 4*64; //no extra padding
-        int[] bandOffsets = {0, 1, 2}; //r, g, b
-        WritableRaster raster = Raster.createInterleavedRaster(buffer, 64, 64, scanlineStride, pixelStride, bandOffsets, null);
-        ColorSpace colorSpace = ColorSpace.getInstance(ColorSpace.CS_sRGB);
-        boolean hasAlpha = false;
-        boolean isAlphaPremultiplied = false;
-        int transparency = Transparency.OPAQUE;
-        int transferType = DataBuffer.TYPE_BYTE;
-        ColorModel colorModel = new ComponentColorModel(colorSpace, hasAlpha, isAlphaPremultiplied, transparency, transferType);
-
-        BufferedImage r = new BufferedImage(colorModel, raster, isAlphaPremultiplied, null);
-
-        return r;
-
-//        DataBuffer buffer = new DataBufferByte(tile, 64 * 64);
-//
-//        ColorModel cm = getImageTypes(0).next().getColorModel();
-//        WritableRaster raster = cm.createCompatibleWritableRaster(64, 64);
-//
-//        //raster.setDataElements(0, 0, 64, 64, buffer);
-//
-//        WritableRaster raster1 = Raster.createInterleavedRaster(
-//                new DataBufferByte(tile, tile.length),
-//                64,
-//                64,
-//                64,
-//                1,
-//                new int[]{0},
-//                null);
-//
-//        int pixelStride = 1; //assuming r, g, b, skip, r, g, b, skip...
-//        int scanlineStride = 1 * 64; //no extra padding
-//        int[] bandOffsets = {0}; //r, g, b
-//        //WritableRaster raster = Raster.createInterleavedRaster(buffer, 64, 64, scanlineStride, pixelStride, bandOffsets, null);
-//
-//
-//        BufferedImage image = new BufferedImage(cm, raster1, true, null);
-//
-//        ImageIO.write(image, "png", new File("D:/test.png"));
-//
-//        return image;
+        return readTile(imageIndex, 0, 7);
 
 //        // Compute initial source region, clip against destination later
 //        Rectangle sourceRegion = getSourceRegion(param, width, height);
@@ -491,7 +386,7 @@ class OzfImageReader extends ImageReader {
     private int getEncryptionDepth(byte[] data, int size, byte key) {
         int encryptionDepth = -1;
 
-        byte[] decompressed = new byte[64 * 64];
+        byte[] decompressed = new byte[OZF_TILE_WIDTH * OZF_TILE_HEIGHT];
 
         byte[] dataCopy = new byte[size];
 
@@ -517,35 +412,84 @@ class OzfImageReader extends ImageReader {
         InputStream inf = new InflaterInputStream(new ByteArrayInputStream(source));
 
         try {
-            int n = inf.read(dest);
-
-            return n;
-        }
-        catch (IOException e) {
+            return inf.read(dest);
+        } catch (IOException e) {
             return -1;
         }
-
-//        ByteArrayOutputStream outputStream = new ByteArrayOutputStream(dest.length);
-//
-//        byte[] buffer = new byte[1024];
-//
-//        Inflater inflater = new Inflater();
-//
-//
-//
-//        inflater.setInput(source);
-//
-//        try {
-//            return inflater.inflate(dest);
-//        }
-//        catch (DataFormatException e) {
-//            return -1;
-//        }
     }
 
     private void checkImageIndex(int imageIndex) {
         if (imageIndex < 0 || imageIndex >= imageInfos.size() - THUMBNAILS) {
             throw new IndexOutOfBoundsException("bad index!");
         }
+    }
+
+    @Override
+    public BufferedImage readTile(int imageIndex, int x, int y) throws IOException {
+        checkImageIndex(imageIndex);
+
+        Iterator<ImageTypeSpecifier> it = getImageTypes(imageIndex);
+
+        if (!it.hasNext()) {
+            throw new IllegalArgumentException("bad iterator!");
+        }
+
+        ImageTypeSpecifier its = it.next();
+
+        ColorModel cm = its.getColorModel();
+        SampleModel sm = its.getSampleModel(OZF_TILE_WIDTH, OZF_TILE_HEIGHT);
+
+        byte[] tileData = getTile(imageIndex, x, y);
+
+        DataBuffer tileDataBuffer = new DataBufferByte(tileData, OZF_TILE_WIDTH * OZF_TILE_HEIGHT);
+
+        WritableRaster writableRaster = Raster.createWritableRaster(sm, tileDataBuffer, null);
+
+        return new BufferedImage(cm, writableRaster, false, null);
+    }
+
+    private byte[] getTile(int imageIndex, int x, int y) throws IOException {
+        checkImageIndex(imageIndex);
+
+        ImageInfo imageInfo = imageInfos.get(imageIndex);
+
+        int i = y * imageInfo.xTiles + x;
+
+        int tileSize = imageInfo.tileOffsetTable[i + 1] - imageInfo.tileOffsetTable[i];
+
+        byte[] tile = new byte[tileSize];
+
+        stream.seek(imageInfo.tileOffsetTable[i]);
+        stream.readFully(tile);
+
+        if (imageInfo.encryptionDepth == -1) {
+            decrypt(tile, 0, tileSize, key);
+        } else {
+            decrypt(tile, 0, imageInfo.encryptionDepth, key);
+        }
+
+        byte[] decompressedTile = new byte[OZF_TILE_WIDTH * OZF_TILE_HEIGHT];
+
+        int n = decompressTile(decompressedTile, tile);
+
+        if (n == -1) {
+            return null;
+        }
+
+        // flip vertical
+        for (int lineIndex = 0; lineIndex < OZF_TILE_HEIGHT / 2; lineIndex++) {
+            byte[] temp = new byte[OZF_TILE_WIDTH];
+
+            int topPosition = lineIndex * OZF_TILE_WIDTH;
+            int downPosition = (OZF_TILE_HEIGHT - 1 - lineIndex) * OZF_TILE_WIDTH;
+
+            System.arraycopy(decompressedTile, topPosition, temp, 0, OZF_TILE_WIDTH);
+
+            System.arraycopy(decompressedTile, downPosition, decompressedTile, topPosition, OZF_TILE_WIDTH);
+
+            System.arraycopy(temp, 0, decompressedTile, downPosition, OZF_TILE_WIDTH);
+        }
+
+        return decompressedTile;
     }
 }

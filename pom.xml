@@ -24,7 +24,7 @@
             <version>2.6</version>
         </dependency>
         <dependency>
-            <groupId>org.checkerframework.annotatedlib</groupId>
+            <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
             <version>25.1-jre</version>
         </dependency>
@@ -38,7 +38,7 @@
 
     <build>
         <plugins>
-            <plugin>
+            <plugin> <!-- for Codacy, Travis-CI uploads coverage report to Codacy -->
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.1</version>
@@ -68,7 +68,6 @@
                     <artifactId>maven-clean-plugin</artifactId>
                     <version>3.0.0</version>
                 </plugin>
-                <!-- see http://maven.apache.org/ref/current/maven-core/default-bindings.html#Plugin_bindings_for_jar_packaging -->
                 <plugin>
                     <artifactId>maven-resources-plugin</artifactId>
                     <version>3.0.2</version>

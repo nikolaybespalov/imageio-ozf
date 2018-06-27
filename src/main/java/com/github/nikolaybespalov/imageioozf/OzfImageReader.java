@@ -10,7 +10,10 @@ import javax.imageio.spi.ImageReaderSpi;
 import javax.imageio.stream.ImageInputStream;
 import java.awt.*;
 import java.awt.image.*;
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -27,13 +30,13 @@ import static com.github.nikolaybespalov.imageioozf.OzfEncryptedStream.decrypt;
 class OzfImageReader extends ImageReader {
     private static final int FILE_HEADER_SIZE = 14;
     private static final int INITIAL_KEY_INDEX = 0x93;
-    private static final int OZF3_HEADER_SIZE = 16;
-    private static final int THUMBNAILS = 2;
     private static final int OZF_TILE_WIDTH = 64;
     private static final int OZF_TILE_HEIGHT = 64;
     private ImageInputStream stream;
     private ImageInputStream encryptedStream;
+    private boolean isOzf3;
     private byte key;
+    private int thumbnails;
     //    private int width;
 //    private int height;
 //    private int bpp;
@@ -81,7 +84,7 @@ class OzfImageReader extends ImageReader {
 
     @Override
     public int getNumImages(boolean allowSearch) {
-        return imageInfo.size() - THUMBNAILS;
+        return imageInfo.size() - thumbnails;
     }
 
     @Override
@@ -229,7 +232,7 @@ class OzfImageReader extends ImageReader {
         try {
             byte[] header = readFileHeader();
 
-            boolean isOzf3 = (header[0] == (byte) 0x80) && (header[1] == (byte) 0x77);
+            isOzf3 = (header[0] == (byte) 0x80) && (header[1] == (byte) 0x77);
 
             if (isOzf3) {
                 byte[] keyTable = readKeyTable();
@@ -245,54 +248,15 @@ class OzfImageReader extends ImageReader {
                 key = (byte) ((initialKey + 0x8A) & 0xFF);
 
                 encryptedStream = new OzfEncryptedStream(stream, key);
+            }
 
-                readOzf3Header(keyTableSize);
+            readImagesInformation();
 
-                int imageTableOffset = readImageTableOffset();
+            for (ImageInfo imageInfo : imageInfo) {
+                int maxHeightOrWidth = Math.max(imageInfo.width, imageInfo.height);
 
-                int imageTableSize = (int) stream.length() - imageTableOffset - 4;
-
-                int images = imageTableSize / 4;
-
-                stream.seek(imageTableOffset);
-
-                int[] imageOffsetTable = new int[images];
-
-                for (int imageIndex = 0; imageIndex < images; imageIndex++) {
-                    imageOffsetTable[imageIndex] = Integer.reverseBytes(encryptedStream.readInt());
-                }
-
-                for (int imageIndex = 0; imageIndex < images; imageIndex++) {
-                    int imageOffset = imageOffsetTable[imageIndex];
-
-                    stream.seek(imageOffset);
-
-                    int width = Integer.reverseBytes(encryptedStream.readInt());
-                    int height = Integer.reverseBytes(encryptedStream.readInt());
-                    short xTiles = Short.reverseBytes(encryptedStream.readShort());
-                    short xyTiles = Short.reverseBytes(encryptedStream.readShort());
-                    byte[] palette = new byte[1024];
-                    encryptedStream.readFully(palette);
-
-                    int tiles = xTiles * xyTiles + 1;
-
-                    int[] tileOffsetTable = new int[tiles];
-
-                    for (int tileIndex = 0; tileIndex < tiles; tileIndex++) {
-                        tileOffsetTable[tileIndex] = Integer.reverseBytes(encryptedStream.readInt());
-                    }
-
-                    int tileSize = tileOffsetTable[1] - tileOffsetTable[0];
-
-                    stream.seek(tileOffsetTable[0]);
-
-                    byte[] tile = new byte[tileSize];
-
-                    stream.readFully(tile);
-
-                    int encryptionDepth = getEncryptionDepth(tile, tileSize, key);
-
-                    imageInfo.add(new ImageInfo(imageOffset, width, height, xTiles, xyTiles, palette, tileOffsetTable, encryptionDepth));
+                if (maxHeightOrWidth == 300 || maxHeightOrWidth == 130) {
+                    thumbnails++;
                 }
             }
         } catch (IOException e) {
@@ -322,29 +286,84 @@ class OzfImageReader extends ImageReader {
         return b;
     }
 
-    private void readOzf3Header(int keyTableSize) throws IOException {
-        encryptedStream.seek(FILE_HEADER_SIZE + keyTableSize + 1 + 4);
+    private void readImagesInformation() throws IOException {
+        int imageTableOffset = readImageTableOffset();
 
-        //encryptedStream.skipBytes(4);
+        int imageTableSize = (int) stream.length() - imageTableOffset - 4;
 
-        byte[] ozf3Header = new byte[OZF3_HEADER_SIZE];
+        int images = imageTableSize / 4;
 
-        encryptedStream.readFully(ozf3Header);
+        stream.seek(imageTableOffset);
 
-        DataInputStream dis = new DataInputStream(new ByteArrayInputStream(ozf3Header));
+        int[] imageOffsetTable = new int[images];
 
-        // skip size field
-        dis.skipBytes(4);
-//        width = Integer.reverseBytes(dis.readInt());
-//        height = Integer.reverseBytes(dis.readInt());
-//        depth = Short.reverseBytes(dis.readShort());
-//        bpp = Short.reverseBytes(dis.readShort());
+        for (int imageIndex = 0; imageIndex < images; imageIndex++) {
+            if (isOzf3) {
+                imageOffsetTable[imageIndex] = Integer.reverseBytes(encryptedStream.readInt());
+            } else {
+                imageOffsetTable[imageIndex] = stream.readInt();
+            }
+        }
+
+        for (int imageIndex = 0; imageIndex < images; imageIndex++) {
+            int imageOffset = imageOffsetTable[imageIndex];
+
+            stream.seek(imageOffset);
+
+            int width;
+            int height;
+            short xTiles;
+            short xyTiles;
+            byte[] palette = new byte[1024];
+
+            if (isOzf3) {
+                width = Integer.reverseBytes(encryptedStream.readInt());
+                height = Integer.reverseBytes(encryptedStream.readInt());
+                xTiles = Short.reverseBytes(encryptedStream.readShort());
+                xyTiles = Short.reverseBytes(encryptedStream.readShort());
+                encryptedStream.readFully(palette);
+            } else {
+                width = stream.readInt();
+                height = stream.readInt();
+                xTiles = stream.readShort();
+                xyTiles = stream.readShort();
+                stream.readFully(palette);
+            }
+
+            int tiles = xTiles * xyTiles + 1;
+
+            int[] tileOffsetTable = new int[tiles];
+
+            for (int tileIndex = 0; tileIndex < tiles; tileIndex++) {
+                if (isOzf3) {
+                    tileOffsetTable[tileIndex] = Integer.reverseBytes(encryptedStream.readInt());
+                } else {
+                    tileOffsetTable[tileIndex] = stream.readInt();
+                }
+            }
+
+            int tileSize = tileOffsetTable[1] - tileOffsetTable[0];
+
+            stream.seek(tileOffsetTable[0]);
+
+            byte[] tile = new byte[tileSize];
+
+            stream.readFully(tile);
+
+            int encryptionDepth = getEncryptionDepth(tile, tileSize, key);
+
+            imageInfo.add(new ImageInfo(imageOffset, width, height, xTiles, xyTiles, palette, tileOffsetTable, encryptionDepth));
+        }
     }
 
     private int readImageTableOffset() throws IOException {
         stream.seek(stream.length() - 4);
 
-        return Integer.reverseBytes(encryptedStream.readInt());
+        if (isOzf3) {
+            return Integer.reverseBytes(encryptedStream.readInt());
+        }
+
+        return stream.readInt();
     }
 
     private int getEncryptionDepth(byte[] data, int size, byte key) {
@@ -359,7 +378,7 @@ class OzfImageReader extends ImageReader {
 
             decrypt(dataCopy, 0, i, key);
 
-            if (decompressTile(decompressed, dataCopy) != -1) {
+            if (decompressTile(dataCopy, decompressed) != -1) {
                 encryptionDepth = i;
                 break;
             }
@@ -372,25 +391,26 @@ class OzfImageReader extends ImageReader {
         return encryptionDepth;
     }
 
-    private int decompressTile(byte[] dest, byte[] source) {
+    private int decompressTile(byte[] source, byte[] dest) {
         InputStream inf = new InflaterInputStream(new ByteArrayInputStream(source));
 
-        ByteArrayOutputStream bas = new ByteArrayOutputStream(10000);
+        ByteArrayOutputStream bas = new ByteArrayOutputStream(OZF_TILE_WIDTH * OZF_TILE_HEIGHT);
 
         try {
-            int n = IOUtils.copy(inf, bas);
+            int decompressedBytes = IOUtils.copy(inf, bas);
 
-            System.arraycopy(bas.toByteArray(), 0, dest, 0, 4096);
+            assert decompressedBytes == OZF_TILE_WIDTH * OZF_TILE_HEIGHT;
 
-            return n;
-            //return inf.read(dest);
+            System.arraycopy(bas.toByteArray(), 0, dest, 0, OZF_TILE_WIDTH * OZF_TILE_HEIGHT);
+
+            return decompressedBytes;
         } catch (IOException e) {
             return -1;
         }
     }
 
     private void checkImageIndex(int imageIndex) {
-        if (imageIndex < 0 || imageIndex >= imageInfo.size() - THUMBNAILS) {
+        if (imageIndex < 0 || imageIndex >= imageInfo.size() - thumbnails) {
             throw new IndexOutOfBoundsException("bad index!");
         }
     }
@@ -433,15 +453,17 @@ class OzfImageReader extends ImageReader {
         stream.seek(imageInfo.tileOffsetTable[i]);
         stream.readFully(tile);
 
-        if (imageInfo.encryptionDepth == -1) {
-            decrypt(tile, 0, tileSize, key);
-        } else {
-            decrypt(tile, 0, imageInfo.encryptionDepth, key);
+        if (isOzf3) {
+            if (imageInfo.encryptionDepth == -1) {
+                decrypt(tile, 0, tileSize, key);
+            } else {
+                decrypt(tile, 0, imageInfo.encryptionDepth, key);
+            }
         }
 
         byte[] decompressedTile = new byte[OZF_TILE_WIDTH * OZF_TILE_HEIGHT];
 
-        int n = decompressTile(decompressedTile, tile);
+        int n = decompressTile(tile, decompressedTile);
 
         if (n == -1) {
             return null;
@@ -464,9 +486,9 @@ class OzfImageReader extends ImageReader {
         return decompressedTile;
     }
 
-    private void copyPixels(byte[] source, byte[] destination, int tx1, int ty1, int tx2, int ty2, int iy1, int ix1, int iy2, int imageWidth) {
+    private void copyPixels(byte[] source, byte[] dest, int tx1, int ty1, int tx2, int ty2, int iy1, int ix1, int iy2, int imageWidth) {
         for (int i = ty1, j = 0; i < ty2 && j < iy2 - iy1; i++, j++) {
-            System.arraycopy(source, i * OZF_TILE_WIDTH + tx1, destination, (iy1 + j) * imageWidth + ix1, tx2 - tx1);
+            System.arraycopy(source, i * OZF_TILE_WIDTH + tx1, dest, (iy1 + j) * imageWidth + ix1, tx2 - tx1);
         }
     }
 }

@@ -34,7 +34,7 @@ class OzfImageReader extends ImageReader {
     private ImageInputStream stream;
     private ImageInputStream encryptedStream;
     private byte key;
-//    private int width;
+    //    private int width;
 //    private int height;
 //    private int bpp;
 //    private int depth;
@@ -128,12 +128,10 @@ class OzfImageReader extends ImageReader {
         return null;
     }
 
-
     @Override
     public BufferedImage read(int imageIndex, ImageReadParam param) throws IOException {
         checkImageIndex(imageIndex);
 
-        // Compute initial source region, clip against destination later
         Rectangle sourceRegion = getSourceRegion(param, getWidth(imageIndex), getHeight(imageIndex));
 
         byte[] result = new byte[sourceRegion.width * sourceRegion.height];
@@ -150,8 +148,6 @@ class OzfImageReader extends ImageReader {
         int x2 = sourceRegion.x + sourceRegion.width;
         int y2 = sourceRegion.y + sourceRegion.height;
 
-        int w = sourceRegion.width;
-
         for (int y = yTileIndex; y < yTiles; y++) {
             for (int x = xTileIndex; x < xTiles; x++) {
                 byte[] tile = getTile(imageIndex, x, y);
@@ -162,9 +158,7 @@ class OzfImageReader extends ImageReader {
                 int d = (y + 1) * OZF_TILE_HEIGHT;
 
                 int tx1 = 0;
-                int tx2 = OZF_TILE_WIDTH;
                 int ix1 = 0;
-                int ix2 = c - x1;
 
                 if (a < x1) {
                     tx1 = x1 - a;
@@ -172,21 +166,25 @@ class OzfImageReader extends ImageReader {
                     ix1 = a - x1;
                 }
 
+                int tx2 = OZF_TILE_WIDTH;
+                int ix2 = c - x1;
+
                 if (x2 < c) {
                     tx2 = OZF_TILE_WIDTH - (c - x2);
                     ix2 = sourceRegion.width;
                 }
 
                 int ty1 = 0;
-                int ty2 = OZF_TILE_HEIGHT;
                 int iy1 = 0;
-                int iy2 = d - y1;
 
                 if (b < y1) {
                     ty1 = y1 - b;
                 } else {
                     iy1 = b - y1;
                 }
+
+                int ty2 = OZF_TILE_HEIGHT;
+                int iy2 = d - y1;
 
                 if (y2 < d) {
                     ty2 = OZF_TILE_HEIGHT - (d - y2);
@@ -195,9 +193,7 @@ class OzfImageReader extends ImageReader {
 
                 assert (ix2 - ix1) == (tx2 - tx1);
 
-                for (int i = ty1, j = 0; i < ty2 && j < iy2 - iy1; i++, j++) {
-                    System.arraycopy(tile, i * OZF_TILE_WIDTH + tx1, result, (iy1 + j) * w + ix1, (tx2 - tx1));
-                }
+                copyPixels(tile, result, tx1, ty1, tx2, ty2, iy1, ix1, iy2, sourceRegion.width);
             }
         }
 
@@ -217,120 +213,6 @@ class OzfImageReader extends ImageReader {
         WritableRaster writableRaster = Raster.createWritableRaster(sm, tileDataBuffer, null);
 
         return new BufferedImage(cm, writableRaster, false, null);
-
-//        // Set everything to default values
-//        int sourceXSubsampling = 1;
-//        int sourceYSubsampling = 1;
-//        int[] sourceBands = null;
-//        int[] destinationBands = null;
-//        Point destinationOffset = new Point(0, 0);
-//
-//        // Get values from the ImageReadParam, if any
-//        if (param != null) {
-//            sourceXSubsampling = param.getSourceXSubsampling();
-//            sourceYSubsampling = param.getSourceYSubsampling();
-//            sourceBands = param.getSourceBands();
-//            destinationBands = param.getDestinationBands();
-//            destinationOffset = param.getDestinationOffset();
-//        }
-//
-//        // Get the specified destination image or create a new one
-//        BufferedImage dst = getDestination(param, getImageTypes(imageIndex), getWidth(imageIndex), getHeight(imageIndex));
-//        // Ensure band settings from param are compatible with images
-//        int inputBands = 1;
-//        checkReadParamBandSettings(param, inputBands, dst.getSampleModel().getNumBands());
-//
-//        int[] bandOffsets = new int[inputBands];
-//        for (int i = 0; i < inputBands; i++) {
-//            bandOffsets[i] = i;
-//        }
-//        int bytesPerRow = getWidth(imageIndex) * inputBands;
-//        DataBufferByte rowDB = new DataBufferByte(bytesPerRow);
-//        WritableRaster rowRas =
-//                Raster.createInterleavedRaster(rowDB,
-//                        getWidth(imageIndex), 1, bytesPerRow,
-//                        inputBands, bandOffsets,
-//                        new Point(0, 0));
-//        byte[] rowBuf = rowDB.getData();
-//
-//        // Create an int[] that can a single pixel
-//        int[] pixel = rowRas.getPixel(0, 0, (int[]) null);
-//
-//        WritableRaster imRas = dst.getWritableTile(0, 0);
-//        int dstMinX = imRas.getMinX();
-//        int dstMaxX = dstMinX + imRas.getWidth() - 1;
-//        int dstMinY = imRas.getMinY();
-//        int dstMaxY = dstMinY + imRas.getHeight() - 1;
-//
-//        // Create a child raster exposing only the desired source bands
-//        if (sourceBands != null) {
-//            rowRas = rowRas.createWritableChild(0, 0,
-//                    width, 1,
-//                    0, 0,
-//                    sourceBands);
-//        }
-//
-//        // Create a child raster exposing only the desired dest bands
-//        if (destinationBands != null) {
-//            imRas = imRas.createWritableChild(0, 0,
-//                    imRas.getWidth(),
-//                    imRas.getHeight(),
-//                    0, 0,
-//                    destinationBands);
-//        }
-//
-//        for (int srcY = 0; srcY < height; srcY++) {
-//            // Read the row
-////            try {
-////                stream.readFully(rowBuf);
-////            } catch (IOException e) {
-////                throw new IIOException("Error reading line " + srcY, e);
-////            }
-//
-//            // Reject rows that lie outside the source region,
-//            // or which aren't part of the subsampling
-//            if ((srcY < sourceRegion.y) ||
-//                    (srcY >= sourceRegion.y + sourceRegion.height) ||
-//                    (((srcY - sourceRegion.y) %
-//                            sourceYSubsampling) != 0)) {
-//                continue;
-//            }
-//
-//            // Determine where the row will go in the destination
-//            int dstY = destinationOffset.y +
-//                    (srcY - sourceRegion.y) / sourceYSubsampling;
-//            if (dstY < dstMinY) {
-//                continue; // The row is above imRas
-//            }
-//            if (dstY > dstMaxY) {
-//                break; // We're done with the image
-//            }
-//
-//            // Copy each (subsampled) source pixel into imRas
-//            for (int srcX = sourceRegion.x;
-//                 srcX < sourceRegion.x + sourceRegion.width;
-//                 srcX++) {
-//                if (((srcX - sourceRegion.x) % sourceXSubsampling) != 0) {
-//                    continue;
-//                }
-//                int dstX = destinationOffset.x +
-//                        (srcX - sourceRegion.x) / sourceXSubsampling;
-//                if (dstX < dstMinX) {
-//                    continue;  // The pixel is to the left of imRas
-//                }
-//                if (dstX > dstMaxX) {
-//                    break; // We're done with the row
-//                }
-//
-//                // Copy the pixel, sub-banding is done automatically
-//                rowRas.getPixel(srcX, 0, pixel);
-//                imRas.setPixel(dstX, dstY, pixel);
-//            }
-//        }
-//
-//        return dst;
-
-        //return readTile(imageIndex, 0, 7);
     }
 
     @Override
@@ -580,5 +462,11 @@ class OzfImageReader extends ImageReader {
         }
 
         return decompressedTile;
+    }
+
+    private void copyPixels(byte[] source, byte[] destination, int tx1, int ty1, int tx2, int ty2, int iy1, int ix1, int iy2, int imageWidth) {
+        for (int i = ty1, j = 0; i < ty2 && j < iy2 - iy1; i++, j++) {
+            System.arraycopy(source, i * OZF_TILE_WIDTH + tx1, destination, (iy1 + j) * imageWidth + ix1, tx2 - tx1);
+        }
     }
 }

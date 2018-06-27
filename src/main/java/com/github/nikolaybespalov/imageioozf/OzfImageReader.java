@@ -342,15 +342,19 @@ class OzfImageReader extends ImageReader {
                 }
             }
 
-            int tileSize = tileOffsetTable[1] - tileOffsetTable[0];
+            int encryptionDepth = -1;
 
-            stream.seek(tileOffsetTable[0]);
+            if (isOzf3) {
+                int tileSize = tileOffsetTable[1] - tileOffsetTable[0];
 
-            byte[] tile = new byte[tileSize];
+                stream.seek(tileOffsetTable[0]);
 
-            stream.readFully(tile);
+                byte[] tile = new byte[tileSize];
 
-            int encryptionDepth = getEncryptionDepth(tile, tileSize, key);
+                stream.readFully(tile);
+
+                encryptionDepth = getEncryptionDepth(tile, tileSize, key);
+            }
 
             imageInfo.add(new ImageInfo(imageOffset, width, height, xTiles, xyTiles, palette, tileOffsetTable, encryptionDepth));
         }

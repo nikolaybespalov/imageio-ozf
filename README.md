@@ -21,7 +21,7 @@ Just add dependency to your _pom.xml_
 Or to your _build.gradle_
 ```
     dependencies {
-        runtime("com.github.nikolaybespalov:imageio-ozf:{imageio.ozf.version}")
+        runtime("com.github.nikolaybespalov:imageio-ozf:${imageio.ozf.version}")
     }
 ```
 And your project will be able to work with .ozf files!

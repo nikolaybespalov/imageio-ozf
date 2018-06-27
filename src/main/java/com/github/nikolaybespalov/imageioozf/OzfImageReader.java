@@ -33,13 +33,12 @@ class OzfImageReader extends ImageReader {
     private static final int OZF_TILE_HEIGHT = 64;
     private ImageInputStream stream;
     private ImageInputStream encryptedStream;
-    private boolean isOzf3;
     private byte key;
-    private int width;
-    private int height;
-    //private int bpp;
-    //private int depth;
-    private List<ImageInfo> imageInfos = new ArrayList<>();
+//    private int width;
+//    private int height;
+//    private int bpp;
+//    private int depth;
+    private List<ImageInfo> imageInfo = new ArrayList<>();
 
     class ImageInfo {
         final int offset;
@@ -82,28 +81,28 @@ class OzfImageReader extends ImageReader {
 
     @Override
     public int getNumImages(boolean allowSearch) {
-        return imageInfos.size() - THUMBNAILS;
+        return imageInfo.size() - THUMBNAILS;
     }
 
     @Override
     public int getWidth(int imageIndex) {
         checkImageIndex(imageIndex);
 
-        return imageInfos.get(imageIndex).width;
+        return imageInfo.get(imageIndex).width;
     }
 
     @Override
     public int getHeight(int imageIndex) {
         checkImageIndex(imageIndex);
 
-        return imageInfos.get(imageIndex).height;
+        return imageInfo.get(imageIndex).height;
     }
 
     @Override
     public Iterator<ImageTypeSpecifier> getImageTypes(int imageIndex) {
         checkImageIndex(imageIndex);
 
-        ImageInfo imageInfo = imageInfos.get(imageIndex);
+        ImageInfo imageInfo = this.imageInfo.get(imageIndex);
 
         int[] bandOffset = new int[]{0};
         SampleModel sm = new PixelInterleavedSampleModel(DataBuffer.TYPE_BYTE, 1, 1, 1, 1, bandOffset);
@@ -157,59 +156,47 @@ class OzfImageReader extends ImageReader {
             for (int x = xTileIndex; x < xTiles; x++) {
                 byte[] tile = getTile(imageIndex, x, y);
 
-                int a = x * 64;
-                int b = y * 64;
-                int c = (x + 1) * 64;
-                int d = (y + 1) * 64;
+                int a = x * OZF_TILE_WIDTH;
+                int b = y * OZF_TILE_HEIGHT;
+                int c = (x + 1) * OZF_TILE_WIDTH;
+                int d = (y + 1) * OZF_TILE_HEIGHT;
 
-                int tx1;
-                int tx2;
-                int ix1;
-                int ix2;
+                int tx1 = 0;
+                int tx2 = OZF_TILE_WIDTH;
+                int ix1 = 0;
+                int ix2 = c - x1;
 
                 if (a < x1) {
                     tx1 = x1 - a;
-                    ix1 = 0;
                 } else {
-                    tx1 = 0;
                     ix1 = a - x1;
                 }
 
                 if (x2 < c) {
-                    tx2 = 64 - (c - x2);
+                    tx2 = OZF_TILE_WIDTH - (c - x2);
                     ix2 = sourceRegion.width;
-                } else {
-                    tx2 = 64;
-                    ix2 = c - x1;
                 }
 
-                int ty1;
-                int ty2;
-                int iy1;
-                int iy2;
+                int ty1 = 0;
+                int ty2 = OZF_TILE_HEIGHT;
+                int iy1 = 0;
+                int iy2 = d - y1;
 
                 if (b < y1) {
                     ty1 = y1 - b;
-                    iy1 = 0;
                 } else {
-                    ty1 = 0;
                     iy1 = b - y1;
                 }
 
                 if (y2 < d) {
-                    ty2 = 64 - (d - x2);
+                    ty2 = OZF_TILE_HEIGHT - (d - y2);
                     iy2 = sourceRegion.height;
-                } else {
-                    ty2 = 64;
-                    iy2 = d - y1;
                 }
-
-                BufferedImage ttt = readTile(imageIndex, x, y);
 
                 assert (ix2 - ix1) == (tx2 - tx1);
 
-                for (int i = ty1, j = 0; i < ty2; i++, j++) {
-                    System.arraycopy(tile, i * 64 + tx1, result, (iy1 + j) * w + ix1, (tx2 - tx1));
+                for (int i = ty1, j = 0; i < ty2 && j < iy2 - iy1; i++, j++) {
+                    System.arraycopy(tile, i * OZF_TILE_WIDTH + tx1, result, (iy1 + j) * w + ix1, (tx2 - tx1));
                 }
             }
         }
@@ -225,15 +212,11 @@ class OzfImageReader extends ImageReader {
         ColorModel cm = its.getColorModel();
         SampleModel sm = its.getSampleModel(sourceRegion.width, sourceRegion.height);
 
-        //byte[] tileData = getTile(imageIndex, x, y);
-
         DataBuffer tileDataBuffer = new DataBufferByte(result, sourceRegion.width * sourceRegion.height);
 
         WritableRaster writableRaster = Raster.createWritableRaster(sm, tileDataBuffer, null);
 
-        BufferedImage image = new BufferedImage(cm, writableRaster, false, null);
-
-        return image;
+        return new BufferedImage(cm, writableRaster, false, null);
 
 //        // Set everything to default values
 //        int sourceXSubsampling = 1;
@@ -364,7 +347,7 @@ class OzfImageReader extends ImageReader {
         try {
             byte[] header = readFileHeader();
 
-            isOzf3 = (header[0] == (byte) 0x80) && (header[1] == (byte) 0x77);
+            boolean isOzf3 = (header[0] == (byte) 0x80) && (header[1] == (byte) 0x77);
 
             if (isOzf3) {
                 byte[] keyTable = readKeyTable();
@@ -427,7 +410,7 @@ class OzfImageReader extends ImageReader {
 
                     int encryptionDepth = getEncryptionDepth(tile, tileSize, key);
 
-                    imageInfos.add(new ImageInfo(imageOffset, width, height, xTiles, xyTiles, palette, tileOffsetTable, encryptionDepth));
+                    imageInfo.add(new ImageInfo(imageOffset, width, height, xTiles, xyTiles, palette, tileOffsetTable, encryptionDepth));
                 }
             }
         } catch (IOException e) {
@@ -470,8 +453,8 @@ class OzfImageReader extends ImageReader {
 
         // skip size field
         dis.skipBytes(4);
-        width = Integer.reverseBytes(dis.readInt());
-        height = Integer.reverseBytes(dis.readInt());
+//        width = Integer.reverseBytes(dis.readInt());
+//        height = Integer.reverseBytes(dis.readInt());
 //        depth = Short.reverseBytes(dis.readShort());
 //        bpp = Short.reverseBytes(dis.readShort());
     }
@@ -525,7 +508,7 @@ class OzfImageReader extends ImageReader {
     }
 
     private void checkImageIndex(int imageIndex) {
-        if (imageIndex < 0 || imageIndex >= imageInfos.size() - THUMBNAILS) {
+        if (imageIndex < 0 || imageIndex >= imageInfo.size() - THUMBNAILS) {
             throw new IndexOutOfBoundsException("bad index!");
         }
     }
@@ -557,7 +540,7 @@ class OzfImageReader extends ImageReader {
     private byte[] getTile(int imageIndex, int x, int y) throws IOException {
         checkImageIndex(imageIndex);
 
-        ImageInfo imageInfo = imageInfos.get(imageIndex);
+        ImageInfo imageInfo = this.imageInfo.get(imageIndex);
 
         int i = y * imageInfo.xTiles + x;
 

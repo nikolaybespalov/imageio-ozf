@@ -34,11 +34,23 @@ public class OzfImageReadTest {
             assertEquals(2048, reader.getHeight(0));
             assertEquals(5, reader.getNumImages(false));
 
-//            ImageReadParam param0 = new ImageReadParam();
-//            param0.setSourceRegion(new Rectangle(1024 + 128, 1024, 128, 64));
-//            BufferedImage image0 = reader.read(0, param0);
-//            assertEquals(2108, image0.getWidth());
-//            assertEquals(2048, image0.getHeight());
+            ImageReadParam param0 = new ImageReadParam();
+            param0.setSourceRegion(new Rectangle(0, 0, 2108, 2048));
+            BufferedImage image0 = reader.read(0, param0);
+            assertEquals(2108, image0.getWidth());
+            assertEquals(2048, image0.getHeight());
+
+            ImageReadParam param1 = new ImageReadParam();
+            param0.setSourceRegion(new Rectangle(0, 0, 527, 512));
+            BufferedImage image1 = reader.read(1, param1);
+            assertEquals(527, image1.getWidth());
+            assertEquals(512, image1.getHeight());
+
+            ImageReadParam param2 = new ImageReadParam();
+            param0.setSourceRegion(new Rectangle(0, 0, 211, 205));
+            BufferedImage image2 = reader.read(2, param2);
+            assertEquals(211, image2.getWidth());
+            assertEquals(205, image2.getHeight());
         }
     }
 }

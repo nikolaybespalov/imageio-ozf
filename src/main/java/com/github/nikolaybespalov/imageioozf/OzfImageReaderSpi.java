@@ -8,17 +8,17 @@ import java.io.IOException;
 import java.util.Locale;
 
 public final class OzfImageReaderSpi extends ImageReaderSpi {
-    static final String[] suffixes = {"ozf2", "ozf3", "ozf4"};
+    private static final String[] suffixes = {"ozf2", "ozf3", "ozf4"};
 
-    static final String[] formatNames = {"OziExplorer Image File"};
+    private static final String[] formatNames = {"OziExplorer Image File"};
 
-    static final String[] MIMETypes = {"image/ozf2", "image/ozf3", "image/ozf4"};
+    private static final String[] MIMETypes = {"image/ozf2", "image/ozf3", "image/ozf4"};
 
-    static final String version = "1.0";
+    private static final String version = "1.0";
 
-    static final String readerCN = "com.github.nikolaybespalov.oziexplorermap.OzfImageReader";
+    private static final String readerCN = "com.github.nikolaybespalov.imageioozf.OzfImageReader";
 
-    static final String vendorName = "Nikolay Bespalov";
+    private static final String vendorName = "Nikolay Bespalov";
 
     public OzfImageReaderSpi() {
         super(vendorName, version, formatNames, suffixes, MIMETypes, readerCN, new Class[]{File.class, ImageInputStream.class}, null, false, null, null, null, null, true, null, null, null, null);
@@ -38,8 +38,6 @@ public final class OzfImageReaderSpi extends ImageReaderSpi {
         stream.readFully(b);
         stream.reset();
 
-        short s = stream.readShort();
-
         // ozfx3
         if (b[0] == (byte) 0x80 && b[1] == (byte) 0x77) {
             return true;
@@ -53,12 +51,12 @@ public final class OzfImageReaderSpi extends ImageReaderSpi {
     }
 
     @Override
-    public ImageReader createReaderInstance(Object extension) throws IOException {
+    public ImageReader createReaderInstance(Object extension) {
         return new OzfImageReader(this);
     }
 
     @Override
     public String getDescription(Locale locale) {
-        return null;
+        return "ASDASDASD";
     }
 }

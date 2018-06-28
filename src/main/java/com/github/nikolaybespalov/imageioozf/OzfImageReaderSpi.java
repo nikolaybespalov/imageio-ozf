@@ -8,11 +8,11 @@ import java.io.IOException;
 import java.util.Locale;
 
 public final class OzfImageReaderSpi extends ImageReaderSpi {
-    private static final String[] suffixes = {"ozf2", "ozf3", "ozf4"};
+    private static final String[] suffixes = {"ozf2", "ozf3"};
 
     private static final String[] formatNames = {"OziExplorer Image File"};
 
-    private static final String[] MIMETypes = {"image/ozf2", "image/ozf3", "image/ozf4"};
+    private static final String[] MIMETypes = {"image/ozf2", "image/ozf3"};
 
     private static final String version = "1.0";
 

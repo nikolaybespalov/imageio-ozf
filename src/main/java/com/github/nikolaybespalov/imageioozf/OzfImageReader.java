@@ -219,8 +219,8 @@ class OzfImageReader extends ImageReader {
     }
 
     @Override
-    public void setInput(Object input) {
-        super.setInput(input);
+    public void setInput(Object input, boolean seekForwardOnly, boolean ignoreMetadata) {
+        super.setInput(input, seekForwardOnly, ignoreMetadata);
 
         if (!(input instanceof ImageInputStream)) {
             throw new IllegalArgumentException("input not an ImageInputStream!");

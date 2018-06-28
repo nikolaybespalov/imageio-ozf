@@ -2,6 +2,7 @@ package com.github.nikolaybespalov.imageioozf;
 
 import com.google.common.io.Resources;
 import org.apache.commons.io.FileUtils;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import javax.imageio.ImageReadParam;
@@ -25,7 +26,7 @@ public class OzfImageReadTest {
      */
     @Test
     public void readWorldOzf2() throws IOException {
-        try (ImageInputStream is = new FileImageInputStream(FileUtils.toFile(Resources.getResource("com/github/nikolaybespalov/imageioozf/World.ozf2")))) {
+        try (ImageInputStream is = new FileImageInputStream(FileUtils.toFile(Resources.getResource("com/github/nikolaybespalov/imageioozf/test-data/World.ozf2")))) {
             ImageReader reader = new OzfImageReader(null);
 
             reader.setInput(is);
@@ -98,7 +99,7 @@ public class OzfImageReadTest {
      */
     @Test
     public void readWorldOzf3() throws IOException {
-        try (ImageInputStream is = new FileImageInputStream(FileUtils.toFile(Resources.getResource("com/github/nikolaybespalov/imageioozf/World.ozf3")))) {
+        try (ImageInputStream is = new FileImageInputStream(FileUtils.toFile(Resources.getResource("com/github/nikolaybespalov/imageioozf/test-data/World.ozf3")))) {
             ImageReader reader = new OzfImageReader(null);
 
             reader.setInput(is);
@@ -145,6 +146,23 @@ public class OzfImageReadTest {
             } catch (IndexOutOfBoundsException e) {
                 // do nothing
             }
+        }
+    }
+
+    /**
+     * This test checks OZF4 image.
+     */
+    @Ignore
+    public void readWorldOzf4() throws IOException {
+        try (ImageInputStream is = new FileImageInputStream(FileUtils.toFile(Resources.getResource("com/github/nikolaybespalov/imageioozf/test-data/World.ozf4")))) {
+            ImageReader reader = new OzfImageReader(null);
+
+            reader.setInput(is);
+
+            // checks basic reader capabilities
+            assertEquals(2108, reader.getWidth(0));
+            assertEquals(2048, reader.getHeight(0));
+            assertEquals(5, reader.getNumImages(false));
         }
     }
 }

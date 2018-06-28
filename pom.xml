@@ -163,6 +163,7 @@
                 <configuration>
                     <passphrase>${env.GPG_PASSPHRASE}</passphrase>
                     <gpgArguments>--batch</gpgArguments>
+                    <skip>${skipNexusStagingDeployMojo}</skip>
                 </configuration>
                 <executions>
                     <execution>

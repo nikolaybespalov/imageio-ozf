@@ -6,7 +6,7 @@
 
     <groupId>com.github.nikolaybespalov</groupId>
     <artifactId>imageio-ozf</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.1-SNAPSHOT</version>
 
     <name>imageio-ozf</name>
     <description>ImageIO plugin that allows you to use OziExplorer image files(ozf2/ozf3/ozf4) without using GDAL/OziApi

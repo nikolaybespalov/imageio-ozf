@@ -212,16 +212,14 @@ class OzfImageReader extends ImageReader {
                 }
 
                 int ty2 = OZF_TILE_HEIGHT;
-                int iy2 = d - y1;
 
                 if (y2 < d) {
                     ty2 = OZF_TILE_HEIGHT - (d - y2);
-                    iy2 = sourceRegion.height;
                 }
 
                 assert (ix2 - ix1) == (tx2 - tx1);
 
-                copyPixels(tile, result, tx1, ty1, tx2, ty2, iy1, ix1, iy2, sourceRegion.width);
+                copyPixels(tile, result, tx1, ty1, tx2, ty2, iy1, ix1, sourceRegion.width);
             }
         }
 
@@ -627,7 +625,7 @@ class OzfImageReader extends ImageReader {
         return decompressedTile;
     }
 
-    private void copyPixels(byte[] source, byte[] dest, int tx1, int ty1, int tx2, int ty2, int iy1, int ix1, int iy2, int imageWidth) {
+    private void copyPixels(byte[] source, byte[] dest, int tx1, int ty1, int tx2, int ty2, int iy1, int ix1, int imageWidth) {
         int j = 0;
 
         for (int i = ty1; i < ty2; i++) {

@@ -407,7 +407,7 @@ class OzfImageReader extends ImageReader {
 
             encryptedStream = new OzfEncryptedStream(stream, key);
 
-            OzfEncryptedStream.decrypt(header, 0, 14, initialKey);
+            decrypt(header, 0, 14, initialKey);
 
             encryptedStream.seek(14 + 1 + keyTableSize);
         }

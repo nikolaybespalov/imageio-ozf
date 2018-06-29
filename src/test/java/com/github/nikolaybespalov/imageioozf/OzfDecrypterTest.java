@@ -1,13 +1,13 @@
 package com.github.nikolaybespalov.imageioozf;
 
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import static com.github.nikolaybespalov.imageioozf.OzfDecrypter.decrypt;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-class OzfDecrypterTest {
+public class OzfDecrypterTest {
     @Test
-    void testDecrypt() {
+    public void testDecrypt() {
         byte[] bytes = {1, 12, 123, 12, 1};
 
         decrypt(bytes, 0, bytes.length, (byte) 11);

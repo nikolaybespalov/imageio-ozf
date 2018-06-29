@@ -47,7 +47,7 @@ class OzfImageReader extends ImageReader {
     private List<ZoomLevel> zoomLevels = new ArrayList<>();
     private List<ZoomLevel> thumbnails = new ArrayList<>();
 
-    class ZoomLevel {
+    private class ZoomLevel {
         final int offset;
         final int width;
         final int height;

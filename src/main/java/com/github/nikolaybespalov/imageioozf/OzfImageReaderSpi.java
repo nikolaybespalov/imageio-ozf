@@ -8,7 +8,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Locale;
 
-import static com.github.nikolaybespalov.imageioozf.OzfEncryptedStream.decrypt;
+import static com.github.nikolaybespalov.imageioozf.OzfDecrypter.decrypt;
 
 public final class OzfImageReaderSpi extends ImageReaderSpi {
     private static final String[] suffixes = {"ozf2", "ozf3"};

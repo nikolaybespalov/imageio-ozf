@@ -21,7 +21,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.zip.InflaterInputStream;
 
-import static com.github.nikolaybespalov.imageioozf.OzfEncryptedStream.decrypt;
+import static com.github.nikolaybespalov.imageioozf.OzfDecrypter.decrypt;
 
 /**
  * https://docs.oracle.com/javase/8/docs/technotes/guides/imageio/spec/imageio_guideTOC.fm.html
@@ -444,9 +444,9 @@ class OzfImageReader extends ImageReader {
     }
 
     private void readImagesInformation() throws IOException {
-        int imageTableOffset = readImageTableOffset();
+        int zoomLevelTableOffset = readZoomLevelTableOffset();
 
-        int imageTableSize = (int) stream.length() - imageTableOffset - 4;
+        int imageTableSize = (int) stream.length() - zoomLevelTableOffset - 4;
 
         if (imageTableSize < 0) {
             throw new IOException("an actual table size is less than zero");
@@ -454,7 +454,7 @@ class OzfImageReader extends ImageReader {
 
         int images = imageTableSize / 4;
 
-        stream.seek(imageTableOffset);
+        stream.seek(zoomLevelTableOffset);
 
         int[] imageOffsetTable = new int[images];
 
@@ -529,7 +529,7 @@ class OzfImageReader extends ImageReader {
         }
     }
 
-    private int readImageTableOffset() throws IOException {
+    private int readZoomLevelTableOffset() throws IOException {
         stream.seek(stream.length() - 4);
 
         if (isOzf3) {
@@ -628,8 +628,10 @@ class OzfImageReader extends ImageReader {
     }
 
     private void copyPixels(byte[] source, byte[] dest, int tx1, int ty1, int tx2, int ty2, int iy1, int ix1, int iy2, int imageWidth) {
-        for (int i = ty1, j = 0; i < ty2 && j < iy2 - iy1; i++, j++) {
-            System.arraycopy(source, i * OZF_TILE_WIDTH + tx1, dest, (iy1 + j) * imageWidth + ix1, tx2 - tx1);
+        int j = 0;
+
+        for (int i = ty1; i < ty2; i++) {
+            System.arraycopy(source, i * OZF_TILE_WIDTH + tx1, dest, (iy1 + j++) * imageWidth + ix1, tx2 - tx1);
         }
     }
 }

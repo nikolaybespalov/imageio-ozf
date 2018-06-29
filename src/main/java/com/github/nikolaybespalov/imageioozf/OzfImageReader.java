@@ -457,6 +457,31 @@ class OzfImageReader extends ImageReader {
     }
 
     @Override
+    public boolean isImageTiled(int i) throws IOException {
+        return super.isImageTiled(i);
+    }
+
+    @Override
+    public int getTileWidth(int i) throws IOException {
+        return super.getTileWidth(i);
+    }
+
+    @Override
+    public int getTileHeight(int i) throws IOException {
+        return super.getTileHeight(i);
+    }
+
+    @Override
+    public int getTileGridXOffset(int i) throws IOException {
+        return super.getTileGridXOffset(i);
+    }
+
+    @Override
+    public int getTileGridYOffset(int i) throws IOException {
+        return super.getTileGridYOffset(i);
+    }
+
+    @Override
     public BufferedImage readTile(int imageIndex, int x, int y) throws IOException {
         readHeader();
 
@@ -480,6 +505,41 @@ class OzfImageReader extends ImageReader {
         WritableRaster writableRaster = Raster.createWritableRaster(sm, tileDataBuffer, null);
 
         return new BufferedImage(cm, writableRaster, false, null);
+    }
+
+    @Override
+    public boolean readerSupportsThumbnails() {
+        return true;
+    }
+
+    @Override
+    public boolean hasThumbnails(int imageIndex) throws IOException {
+        readHeader();
+
+        checkImageIndex(imageIndex);
+
+        return imageIndex == imageInfo.size() - 1 ||
+                imageIndex == imageInfo.size() - 2;
+    }
+
+    @Override
+    public int getNumThumbnails(int i) throws IOException {
+        return super.getNumThumbnails(i);
+    }
+
+    @Override
+    public int getThumbnailWidth(int i, int i1) throws IOException {
+        return super.getThumbnailWidth(i, i1);
+    }
+
+    @Override
+    public int getThumbnailHeight(int i, int i1) throws IOException {
+        return super.getThumbnailHeight(i, i1);
+    }
+
+    @Override
+    public BufferedImage readThumbnail(int i, int i1) throws IOException {
+        return super.readThumbnail(i, i1);
     }
 
     private byte[] getTile(int imageIndex, int x, int y) throws IOException {

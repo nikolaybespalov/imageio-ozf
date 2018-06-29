@@ -4,6 +4,7 @@ import com.google.common.io.Resources;
 import org.apache.commons.io.FileUtils;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 
 import javax.imageio.ImageReadParam;
 import javax.imageio.ImageReader;
@@ -13,8 +14,7 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 /**
  * Testing reading capabilities.
@@ -35,6 +35,7 @@ public class OzfImageReadTest {
             assertEquals(499, reader.getWidth(0));
             assertEquals(250, reader.getHeight(0));
             assertEquals(8, reader.getNumImages(false));
+            assertNotNull(reader.readTile(0, 0, 0));
 
             ImageReadParam param0 = new ImageReadParam();
             param0.setSourceRegion(new Rectangle(0, 0, 499, 250));
@@ -108,6 +109,7 @@ public class OzfImageReadTest {
             assertEquals(2108, reader.getWidth(0));
             assertEquals(2048, reader.getHeight(0));
             assertEquals(5, reader.getNumImages(false));
+            assertNotNull(reader.readTile(0, 0, 0));
 
             ImageReadParam param0 = new ImageReadParam();
             param0.setSourceRegion(new Rectangle(0, 0, 2108, 2048));
@@ -163,6 +165,22 @@ public class OzfImageReadTest {
             assertEquals(2108, reader.getWidth(0));
             assertEquals(2048, reader.getHeight(0));
             assertEquals(5, reader.getNumImages(false));
+        }
+    }
+
+    /**
+     * This test checks "short" OZF3 file.
+     * <p>
+     * This means that the size of the initialization key table is less than 0x94.
+     */
+    @Test
+    public void readShortOzf3() throws IOException {
+        try (ImageInputStream is = new FileImageInputStream(FileUtils.toFile(Resources.getResource("com/github/nikolaybespalov/imageioozf/test-data/Short.ozf3")))) {
+            ImageReader reader = new OzfImageReader(null);
+
+            reader.setInput(is);
+
+            Assertions.assertThrows(IOException.class, () -> assertNotNull(reader.readTile(0, 0, 0)));
         }
     }
 }

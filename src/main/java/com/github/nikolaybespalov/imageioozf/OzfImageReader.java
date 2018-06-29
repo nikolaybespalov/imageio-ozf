@@ -7,6 +7,7 @@ import javax.imageio.ImageReader;
 import javax.imageio.ImageTypeSpecifier;
 import javax.imageio.metadata.IIOMetadata;
 import javax.imageio.spi.ImageReaderSpi;
+import javax.imageio.stream.FileImageInputStream;
 import javax.imageio.stream.ImageInputStream;
 import java.awt.*;
 import java.awt.image.*;
@@ -34,6 +35,7 @@ class OzfImageReader extends ImageReader {
     private static final int OZF_TILE_HEIGHT = 64;
     private ImageInputStream stream;
     private ImageInputStream encryptedStream;
+    private boolean headerRead = false;
     private boolean isOzf3;
     private byte key;
     private int thumbnails;
@@ -83,26 +85,34 @@ class OzfImageReader extends ImageReader {
     }
 
     @Override
-    public int getNumImages(boolean allowSearch) {
+    public int getNumImages(boolean allowSearch) throws IOException {
+        readHeader();
+
         return imageInfo.size() - thumbnails;
     }
 
     @Override
-    public int getWidth(int imageIndex) {
+    public int getWidth(int imageIndex) throws IOException {
+        readHeader();
+
         checkImageIndex(imageIndex);
 
         return imageInfo.get(imageIndex).width;
     }
 
     @Override
-    public int getHeight(int imageIndex) {
+    public int getHeight(int imageIndex) throws IOException {
+        readHeader();
+
         checkImageIndex(imageIndex);
 
         return imageInfo.get(imageIndex).height;
     }
 
     @Override
-    public Iterator<ImageTypeSpecifier> getImageTypes(int imageIndex) {
+    public Iterator<ImageTypeSpecifier> getImageTypes(int imageIndex) throws IOException {
+        readHeader();
+
         checkImageIndex(imageIndex);
 
         ImageInfo imageInfo = this.imageInfo.get(imageIndex);
@@ -120,12 +130,16 @@ class OzfImageReader extends ImageReader {
     }
 
     @Override
-    public IIOMetadata getStreamMetadata() {
+    public IIOMetadata getStreamMetadata() throws IOException {
+        readHeader();
+
         return null;
     }
 
     @Override
-    public IIOMetadata getImageMetadata(int imageIndex) {
+    public IIOMetadata getImageMetadata(int imageIndex) throws IOException {
+        readHeader();
+
         checkImageIndex(imageIndex);
 
         return null;
@@ -133,6 +147,8 @@ class OzfImageReader extends ImageReader {
 
     @Override
     public BufferedImage read(int imageIndex, ImageReadParam param) throws IOException {
+        readHeader();
+
         checkImageIndex(imageIndex);
 
         Rectangle sourceRegion = getSourceRegion(param, getWidth(imageIndex), getHeight(imageIndex));
@@ -220,48 +236,61 @@ class OzfImageReader extends ImageReader {
 
     @Override
     public void setInput(Object input, boolean seekForwardOnly, boolean ignoreMetadata) {
-        super.setInput(input, seekForwardOnly, ignoreMetadata);
-
-        if (!(input instanceof ImageInputStream)) {
-            throw new IllegalArgumentException("input not an ImageInputStream!");
+        if (!(input instanceof FileImageInputStream)) {
+            throw new IllegalArgumentException("input not an FileImageInputStream!");
         }
 
-        stream = (ImageInputStream) input;
+        stream = (FileImageInputStream) input;
         stream.setByteOrder(ByteOrder.LITTLE_ENDIAN);
+    }
 
-        try {
-            byte[] header = readFileHeader();
-
-            isOzf3 = (header[0] == (byte) 0x80) && (header[1] == (byte) 0x77);
-
-            if (isOzf3) {
-                byte[] keyTable = readKeyTable();
-
-                int keyTableSize = keyTable.length;
-
-                if (keyTableSize < INITIAL_KEY_INDEX + 1) {
-                    throw new IOException("too few data!");
-                }
-
-                byte initialKey = keyTable[INITIAL_KEY_INDEX];
-
-                key = (byte) ((initialKey + 0x8A) & 0xFF);
-
-                encryptedStream = new OzfEncryptedStream(stream, key);
-            }
-
-            readImagesInformation();
-
-            for (ImageInfo imageInfo : imageInfo) {
-                int maxHeightOrWidth = Math.max(imageInfo.width, imageInfo.height);
-
-                if (maxHeightOrWidth == 300 || maxHeightOrWidth == 130) {
-                    thumbnails++;
-                }
-            }
-        } catch (IOException e) {
-            throw new IllegalArgumentException(e);
+    private void readHeader() throws IOException {
+        if (headerRead) {
+            return;
         }
+
+        byte[] header = readFileHeader();
+
+        isOzf3 = (header[0] == (byte) 0x80) && (header[1] == (byte) 0x77);
+
+        if (isOzf3) {
+            byte[] keyTable = readKeyTable();
+
+            int keyTableSize = keyTable.length;
+
+            if (keyTableSize < INITIAL_KEY_INDEX + 1) {
+                throw new IOException("too few data!");
+            }
+
+            byte initialKey = keyTable[INITIAL_KEY_INDEX];
+
+            key = (byte) ((initialKey + 0x8A) & 0xFF);
+
+            encryptedStream = new OzfEncryptedStream(stream, key);
+
+            OzfEncryptedStream.decrypt(header, 0, 14, initialKey);
+
+            encryptedStream.seek(14 + 1 + keyTableSize);
+        }
+
+        if (!(header[6] == (byte) 0x40 && header[7] == (byte) 0x00 &&
+                header[8] == (byte) 0x01 && header[9] == (byte) 0x00 &&
+                header[10] == (byte) 0x36 && header[11] == (byte) 0x04 &&
+                header[12] == (byte) 0x00 && header[13] == (byte) 0x00)) {
+            throw new IOException("an actual header is not equals expected");
+        }
+
+        readImagesInformation();
+
+        for (ImageInfo imageInfo : imageInfo) {
+            int maxHeightOrWidth = Math.max(imageInfo.width, imageInfo.height);
+
+            if (maxHeightOrWidth == 300 || maxHeightOrWidth == 130) {
+                thumbnails++;
+            }
+        }
+
+        headerRead = true;
     }
 
     private byte[] readFileHeader() throws IOException {
@@ -289,7 +318,15 @@ class OzfImageReader extends ImageReader {
     private void readImagesInformation() throws IOException {
         int imageTableOffset = readImageTableOffset();
 
+        if (imageTableOffset < 0) {
+            throw new IOException("an actual table offset is less than zero");
+        }
+
         int imageTableSize = (int) stream.length() - imageTableOffset - 4;
+
+        if (imageTableSize < 0) {
+            throw new IOException("an actual table size is less than zero");
+        }
 
         int images = imageTableSize / 4;
 
@@ -421,6 +458,8 @@ class OzfImageReader extends ImageReader {
 
     @Override
     public BufferedImage readTile(int imageIndex, int x, int y) throws IOException {
+        readHeader();
+
         checkImageIndex(imageIndex);
 
         Iterator<ImageTypeSpecifier> it = getImageTypes(imageIndex);

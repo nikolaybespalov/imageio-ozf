@@ -2,6 +2,7 @@ package com.github.nikolaybespalov.imageioozf;
 
 import javax.imageio.ImageReader;
 import javax.imageio.spi.ImageReaderSpi;
+import javax.imageio.stream.FileImageInputStream;
 import javax.imageio.stream.ImageInputStream;
 import java.io.File;
 import java.io.IOException;
@@ -21,7 +22,7 @@ public final class OzfImageReaderSpi extends ImageReaderSpi {
     private static final String vendorName = "Nikolay Bespalov";
 
     public OzfImageReaderSpi() {
-        super(vendorName, version, formatNames, suffixes, MIMETypes, readerCN, new Class[]{File.class, ImageInputStream.class}, null, false, null, null, null, null, true, null, null, null, null);
+        super(vendorName, version, formatNames, suffixes, MIMETypes, readerCN, new Class[]{File.class, FileImageInputStream.class}, null, false, null, null, null, null, true, null, null, null, null);
     }
 
     @Override
@@ -38,13 +39,31 @@ public final class OzfImageReaderSpi extends ImageReaderSpi {
         stream.readFully(b);
         stream.reset();
 
-        // ozfx3
+        // ozf3
         if (b[0] == (byte) 0x80 && b[1] == (byte) 0x77) {
-            return true;
+            stream.mark();
+
+            stream.seek(14);
+
+            int n = stream.read();
+
+            if (n < 0x94) {
+                return false;
+            }
+
+            byte[] asd = new byte[n];
+
+            stream.readFully(asd);
+
+            OzfEncryptedStream.decrypt(b, 0, 14, asd[0x93]);
+
+            stream.reset();
+        } else if (!(b[0] == (byte) 0x78 && b[1] == (byte) 0x77)) {
+            return false;
         }
 
-        return b[0] == (byte) 0x78 && b[1] == (byte) 0x77 &&
-                b[6] == (byte) 0x40 && b[7] == (byte) 0x00 &&
+        // ozf2 or ozf3 and magic numbers
+        return b[6] == (byte) 0x40 && b[7] == (byte) 0x00 &&
                 b[8] == (byte) 0x01 && b[9] == (byte) 0x00 &&
                 b[10] == (byte) 0x36 && b[11] == (byte) 0x04 &&
                 b[12] == (byte) 0x00 && b[13] == (byte) 0x00;
@@ -57,6 +76,6 @@ public final class OzfImageReaderSpi extends ImageReaderSpi {
 
     @Override
     public String getDescription(Locale locale) {
-        return "ASDASDASD";
+        return "OziExplorer Image File Reader";
     }
 }

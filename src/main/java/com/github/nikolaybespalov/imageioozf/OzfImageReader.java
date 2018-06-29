@@ -48,23 +48,19 @@ class OzfImageReader extends ImageReader {
     private List<ZoomLevel> thumbnails = new ArrayList<>();
 
     private class ZoomLevel {
-        final int offset;
-        final int width;
-        final int height;
-        final int xTiles;
-        final int yTiles;
-        final byte[] palette; // B(0)G(1)R(2)_(3)
-        final int[] tileOffsetTable;
-        final int encryptionDepth;
-        final ColorModel cm;
+        private final int width;
+        private final int height;
+        private final int xTiles;
+        private final int yTiles;
+        private final int[] tileOffsetTable;
+        private final int encryptionDepth;
+        private final ColorModel cm;
 
-        ZoomLevel(int offset, int width, int height, int xTiles, int yTiles, byte[] palette, int[] tileOffsetTable, int encryptionDepth) {
-            this.offset = offset;
+        ZoomLevel(int width, int height, int xTiles, int yTiles, byte[] palette, int[] tileOffsetTable, int encryptionDepth) {
             this.width = width;
             this.height = height;
             this.xTiles = xTiles;
             this.yTiles = yTiles;
-            this.palette = palette;
             this.tileOffsetTable = tileOffsetTable;
             this.encryptionDepth = encryptionDepth;
 
@@ -72,6 +68,7 @@ class OzfImageReader extends ImageReader {
             byte[] g = new byte[256];
             byte[] b = new byte[256];
 
+            // B(0)G(1)R(2)_(3)
             for (int i = 0; i < 256; i++) {
                 r[i] = palette[i * 4 + 2];
                 g[i] = palette[i * 4 + 1];
@@ -520,7 +517,7 @@ class OzfImageReader extends ImageReader {
                 encryptionDepth = getEncryptionDepth(tile, tileSize, key);
             }
 
-            ZoomLevel zoomLevel = new ZoomLevel(imageOffset, width, height, xTiles, xyTiles, palette, tileOffsetTable, encryptionDepth);
+            ZoomLevel zoomLevel = new ZoomLevel(width, height, xTiles, xyTiles, palette, tileOffsetTable, encryptionDepth);
 
             int maxWidthOrHeight = Math.max(width, height);
 

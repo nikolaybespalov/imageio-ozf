@@ -210,10 +210,10 @@ public class OzfImageReadTest {
 
             reader.setInput(is);
 
+            // Codacy says "JUnit tests should include assert() or fail()".
+            assertNotNull(reader);
+
             assertThrows(IOException.class, () -> assertNotNull(reader.readTile(0, 0, 0)));
         }
-
-        // Codacy says "JUnit tests should include assert() or fail()".
-        assertTrue(true);
     }
 }

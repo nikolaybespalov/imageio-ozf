@@ -8,6 +8,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Locale;
 
+import static com.github.nikolaybespalov.imageioozf.OzfEncryptedStream.decrypt;
+
 public final class OzfImageReaderSpi extends ImageReaderSpi {
     private static final String[] suffixes = {"ozf2", "ozf3"};
 
@@ -55,7 +57,7 @@ public final class OzfImageReaderSpi extends ImageReaderSpi {
 
             stream.readFully(asd);
 
-            OzfEncryptedStream.decrypt(b, 0, 14, asd[0x93]);
+            decrypt(b, 0, 14, asd[0x93]);
 
             stream.reset();
         } else if (!(b[0] == (byte) 0x78 && b[1] == (byte) 0x77)) {

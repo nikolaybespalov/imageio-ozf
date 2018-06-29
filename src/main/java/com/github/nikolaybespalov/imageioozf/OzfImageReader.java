@@ -122,7 +122,7 @@ class OzfImageReader extends ImageReader {
 
         ImageTypeSpecifier imageTypeSpecifier = new ImageTypeSpecifier(imageInfo.cm, sm);
 
-        java.util.List<ImageTypeSpecifier> imageTypeSpecifiers = new ArrayList<>();
+        List<ImageTypeSpecifier> imageTypeSpecifiers = new ArrayList<>();
 
         imageTypeSpecifiers.add(imageTypeSpecifier);
 

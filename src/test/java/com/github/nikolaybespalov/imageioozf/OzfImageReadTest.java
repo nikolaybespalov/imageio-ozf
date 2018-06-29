@@ -31,59 +31,89 @@ public class OzfImageReadTest {
 
             reader.setInput(is);
 
+            assertTrue(reader.readerSupportsThumbnails());
+            assertEquals(300, reader.getThumbnailWidth(0, 0));
+            assertEquals(150, reader.getThumbnailHeight(0, 0));
+
             // checks basic reader capabilities
-            assertEquals(499, reader.getWidth(0));
-            assertEquals(250, reader.getHeight(0));
             assertEquals(8, reader.getNumImages(false));
             assertNotNull(reader.readTile(0, 0, 0));
+            assertEquals(64, reader.getTileWidth(0));
+            assertEquals(64, reader.getTileHeight(0));
+            assertEquals(0, reader.getTileGridXOffset(0));
+            assertEquals(0, reader.getTileGridYOffset(0));
 
             ImageReadParam param0 = new ImageReadParam();
             param0.setSourceRegion(new Rectangle(0, 0, 499, 250));
             BufferedImage image0 = reader.read(0, param0);
             assertEquals(499, image0.getWidth());
             assertEquals(250, image0.getHeight());
+            assertTrue(reader.hasThumbnails(0));
+            assertEquals(1, reader.getNumThumbnails(0));
+            assertTrue(reader.isImageTiled(0));
 
             ImageReadParam param1 = new ImageReadParam();
             param0.setSourceRegion(new Rectangle(0, 0, 374, 187));
             BufferedImage image1 = reader.read(1, param1);
             assertEquals(374, image1.getWidth());
             assertEquals(187, image1.getHeight());
+            assertTrue(reader.hasThumbnails(1));
+            assertEquals(1, reader.getNumThumbnails(1));
+            assertTrue(reader.isImageTiled(1));
 
             ImageReadParam param2 = new ImageReadParam();
             param0.setSourceRegion(new Rectangle(0, 0, 249, 125));
             BufferedImage image2 = reader.read(2, param2);
             assertEquals(249, image2.getWidth());
             assertEquals(125, image2.getHeight());
+            assertTrue(reader.hasThumbnails(2));
+            assertEquals(1, reader.getNumThumbnails(2));
+            assertTrue(reader.isImageTiled(2));
 
             ImageReadParam param3 = new ImageReadParam();
             param0.setSourceRegion(new Rectangle(0, 0, 166, 83));
             BufferedImage image3 = reader.read(3, param3);
             assertEquals(166, image3.getWidth());
             assertEquals(83, image3.getHeight());
+            assertTrue(reader.hasThumbnails(3));
+            assertEquals(1, reader.getNumThumbnails(3));
+            assertTrue(reader.isImageTiled(3));
 
             ImageReadParam param4 = new ImageReadParam();
             param0.setSourceRegion(new Rectangle(0, 0, 99, 50));
             BufferedImage image4 = reader.read(4, param4);
             assertEquals(99, image4.getWidth());
             assertEquals(50, image4.getHeight());
+            assertTrue(reader.hasThumbnails(4));
+            assertEquals(1, reader.getNumThumbnails(4));
+            assertTrue(reader.isImageTiled(4));
 
             ImageReadParam param5 = new ImageReadParam();
             param0.setSourceRegion(new Rectangle(0, 0, 49, 25));
             BufferedImage image5 = reader.read(5, param5);
             assertEquals(49, image5.getWidth());
             assertEquals(25, image5.getHeight());
+            assertTrue(reader.hasThumbnails(5));
+            assertEquals(1, reader.getNumThumbnails(5));
+            assertTrue(reader.isImageTiled(5));
 
             ImageReadParam param6 = new ImageReadParam();
             param0.setSourceRegion(new Rectangle(0, 0, 24, 12));
             BufferedImage image6 = reader.read(6, param6);
             assertEquals(24, image6.getWidth());
             assertEquals(12, image6.getHeight());
+            assertTrue(reader.hasThumbnails(6));
+            assertEquals(1, reader.getNumThumbnails(6));
+            assertTrue(reader.isImageTiled(6));
 
             ImageReadParam param7 = new ImageReadParam();
             param0.setSourceRegion(new Rectangle(0, 0, 12, 6));
             BufferedImage image7 = reader.read(7, param7);
             assertEquals(12, image7.getWidth());
             assertEquals(6, image7.getHeight());
+            assertTrue(reader.hasThumbnails(7));
+            assertEquals(1, reader.getNumThumbnails(7));
+            assertTrue(reader.isImageTiled(7));
 
             // check for expected exception when image index is out of bounds
             try {

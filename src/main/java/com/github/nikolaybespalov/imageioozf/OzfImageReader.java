@@ -25,6 +25,8 @@ import static com.github.nikolaybespalov.imageioozf.OzfEncryptedStream.decrypt;
 
 /**
  * https://docs.oracle.com/javase/8/docs/technotes/guides/imageio/spec/imageio_guideTOC.fm.html
+ * <p>
+ * TODO: Listeners for long operations
  *
  * @see <a href="https://trac.osgeo.org/gdal/browser/sandbox/klokan/ozf/ozf-binary-format-description.txt">ozf-binary-format-description.txt</a>
  */
@@ -38,14 +40,14 @@ class OzfImageReader extends ImageReader {
     private boolean headerRead = false;
     private boolean isOzf3;
     private byte key;
-    private int thumbnails;
     //    private int width;
 //    private int height;
 //    private int bpp;
 //    private int depth;
-    private List<ImageInfo> imageInfo = new ArrayList<>();
+    private List<ZoomLevel> zoomLevels = new ArrayList<>();
+    private List<ZoomLevel> thumbnails = new ArrayList<>();
 
-    class ImageInfo {
+    class ZoomLevel {
         final int offset;
         final int width;
         final int height;
@@ -56,7 +58,7 @@ class OzfImageReader extends ImageReader {
         final int encryptionDepth;
         final ColorModel cm;
 
-        ImageInfo(int offset, int width, int height, int xTiles, int yTiles, byte[] palette, int[] tileOffsetTable, int encryptionDepth) {
+        ZoomLevel(int offset, int width, int height, int xTiles, int yTiles, byte[] palette, int[] tileOffsetTable, int encryptionDepth) {
             this.offset = offset;
             this.width = width;
             this.height = height;
@@ -85,10 +87,20 @@ class OzfImageReader extends ImageReader {
     }
 
     @Override
+    public void setInput(Object input, boolean seekForwardOnly, boolean ignoreMetadata) {
+        if (!(input instanceof FileImageInputStream)) {
+            throw new IllegalArgumentException("input not an FileImageInputStream!");
+        }
+
+        stream = (FileImageInputStream) input;
+        stream.setByteOrder(ByteOrder.LITTLE_ENDIAN);
+    }
+
+    @Override
     public int getNumImages(boolean allowSearch) throws IOException {
         readHeader();
 
-        return imageInfo.size() - thumbnails;
+        return zoomLevels.size();
     }
 
     @Override
@@ -97,7 +109,7 @@ class OzfImageReader extends ImageReader {
 
         checkImageIndex(imageIndex);
 
-        return imageInfo.get(imageIndex).width;
+        return zoomLevels.get(imageIndex).width;
     }
 
     @Override
@@ -106,7 +118,7 @@ class OzfImageReader extends ImageReader {
 
         checkImageIndex(imageIndex);
 
-        return imageInfo.get(imageIndex).height;
+        return zoomLevels.get(imageIndex).height;
     }
 
     @Override
@@ -115,12 +127,12 @@ class OzfImageReader extends ImageReader {
 
         checkImageIndex(imageIndex);
 
-        ImageInfo imageInfo = this.imageInfo.get(imageIndex);
+        ZoomLevel zoomLevel = this.zoomLevels.get(imageIndex);
 
         int[] bandOffset = new int[]{0};
         SampleModel sm = new PixelInterleavedSampleModel(DataBuffer.TYPE_BYTE, 1, 1, 1, 1, bandOffset);
 
-        ImageTypeSpecifier imageTypeSpecifier = new ImageTypeSpecifier(imageInfo.cm, sm);
+        ImageTypeSpecifier imageTypeSpecifier = new ImageTypeSpecifier(zoomLevel.cm, sm);
 
         List<ImageTypeSpecifier> imageTypeSpecifiers = new ArrayList<>();
 
@@ -235,13 +247,140 @@ class OzfImageReader extends ImageReader {
     }
 
     @Override
-    public void setInput(Object input, boolean seekForwardOnly, boolean ignoreMetadata) {
-        if (!(input instanceof FileImageInputStream)) {
-            throw new IllegalArgumentException("input not an FileImageInputStream!");
+    public boolean isImageTiled(int imageIndex) throws IOException {
+        readHeader();
+
+        checkImageIndex(imageIndex);
+
+        return true;
+    }
+
+    @Override
+    public int getTileWidth(int imageIndex) throws IOException {
+        readHeader();
+
+        checkImageIndex(imageIndex);
+
+        return OZF_TILE_WIDTH;
+    }
+
+    @Override
+    public int getTileHeight(int imageIndex) throws IOException {
+        readHeader();
+
+        checkImageIndex(imageIndex);
+
+        return OZF_TILE_HEIGHT;
+    }
+
+    @Override
+    public int getTileGridXOffset(int imageIndex) throws IOException {
+        readHeader();
+
+        checkImageIndex(imageIndex);
+
+        return 0;
+    }
+
+    @Override
+    public int getTileGridYOffset(int imageIndex) throws IOException {
+        readHeader();
+
+        checkImageIndex(imageIndex);
+
+        return 0;
+    }
+
+    @Override
+    public BufferedImage readTile(int imageIndex, int x, int y) throws IOException {
+        readHeader();
+
+        checkImageIndex(imageIndex);
+
+        if (zoomLevels.get(imageIndex).xTiles < x || x < 0) {
+            throw new IllegalArgumentException("bad x!");
         }
 
-        stream = (FileImageInputStream) input;
-        stream.setByteOrder(ByteOrder.LITTLE_ENDIAN);
+        if (zoomLevels.get(imageIndex).yTiles < y || y < 0) {
+            throw new IllegalArgumentException("bad y!");
+        }
+
+        Iterator<ImageTypeSpecifier> it = getImageTypes(imageIndex);
+
+        if (!it.hasNext()) {
+            throw new IllegalArgumentException("bad iterator!");
+        }
+
+        ImageTypeSpecifier its = it.next();
+
+        ColorModel cm = its.getColorModel();
+        SampleModel sm = its.getSampleModel(OZF_TILE_WIDTH, OZF_TILE_HEIGHT);
+
+        byte[] tileData = getTile(imageIndex, x, y);
+
+        DataBuffer tileDataBuffer = new DataBufferByte(tileData, OZF_TILE_WIDTH * OZF_TILE_HEIGHT);
+
+        WritableRaster writableRaster = Raster.createWritableRaster(sm, tileDataBuffer, null);
+
+        return new BufferedImage(cm, writableRaster, false, null);
+    }
+
+    @Override
+    public boolean readerSupportsThumbnails() {
+        return true;
+    }
+
+    @Override
+    public boolean hasThumbnails(int imageIndex) throws IOException {
+        readHeader();
+
+        checkImageIndex(imageIndex);
+
+        return readerSupportsThumbnails();
+    }
+
+    @Override
+    public int getNumThumbnails(int imageIndex) {
+        return thumbnails.size();
+    }
+
+    @Override
+    public int getThumbnailWidth(int imageIndex, int thumbnailIndex) throws IOException {
+        readHeader();
+
+        checkImageIndex(imageIndex);
+
+        checkThumbnailIndex(thumbnailIndex);
+
+        return thumbnails.get(thumbnailIndex).width;
+    }
+
+    @Override
+    public int getThumbnailHeight(int imageIndex, int thumbnailIndex) throws IOException {
+        readHeader();
+
+        checkImageIndex(imageIndex);
+
+        checkThumbnailIndex(thumbnailIndex);
+
+        return thumbnails.get(thumbnailIndex).height;
+    }
+
+    @Override
+    public BufferedImage readThumbnail(int imageIndex, int thumbnailIndex) throws IOException {
+        return super.readThumbnail(imageIndex, thumbnailIndex);
+    }
+
+    private void checkImageIndex(int imageIndex) {
+        if (imageIndex < 0 || imageIndex >= zoomLevels.size()) {
+            throw new IndexOutOfBoundsException("bad imageIndex!");
+        }
+    }
+
+    private void checkThumbnailIndex(int thumbnailIndex) {
+        if (thumbnailIndex < 0 || thumbnailIndex >= thumbnails.size()) {
+            throw new IndexOutOfBoundsException("bad thumbnailIndex!");
+        }
     }
 
     private void readHeader() throws IOException {
@@ -282,14 +421,6 @@ class OzfImageReader extends ImageReader {
 
         readImagesInformation();
 
-        for (ImageInfo imageInfo : imageInfo) {
-            int maxHeightOrWidth = Math.max(imageInfo.width, imageInfo.height);
-
-            if (maxHeightOrWidth == 300 || maxHeightOrWidth == 130) {
-                thumbnails++;
-            }
-        }
-
         headerRead = true;
     }
 
@@ -317,10 +448,6 @@ class OzfImageReader extends ImageReader {
 
     private void readImagesInformation() throws IOException {
         int imageTableOffset = readImageTableOffset();
-
-        if (imageTableOffset < 0) {
-            throw new IOException("an actual table offset is less than zero");
-        }
 
         int imageTableSize = (int) stream.length() - imageTableOffset - 4;
 
@@ -393,7 +520,15 @@ class OzfImageReader extends ImageReader {
                 encryptionDepth = getEncryptionDepth(tile, tileSize, key);
             }
 
-            imageInfo.add(new ImageInfo(imageOffset, width, height, xTiles, xyTiles, palette, tileOffsetTable, encryptionDepth));
+            ZoomLevel zoomLevel = new ZoomLevel(imageOffset, width, height, xTiles, xyTiles, palette, tileOffsetTable, encryptionDepth);
+
+            int maxWidthOrHeight = Math.max(width, height);
+
+            if (maxWidthOrHeight == 300 || maxWidthOrHeight == 130) {
+                thumbnails.add(zoomLevel);
+            } else {
+                zoomLevels.add(zoomLevel);
+            }
         }
     }
 
@@ -450,117 +585,23 @@ class OzfImageReader extends ImageReader {
         }
     }
 
-    private void checkImageIndex(int imageIndex) {
-        if (imageIndex < 0 || imageIndex >= imageInfo.size() - thumbnails) {
-            throw new IndexOutOfBoundsException("bad index!");
-        }
-    }
-
-    @Override
-    public boolean isImageTiled(int i) throws IOException {
-        return super.isImageTiled(i);
-    }
-
-    @Override
-    public int getTileWidth(int i) throws IOException {
-        return super.getTileWidth(i);
-    }
-
-    @Override
-    public int getTileHeight(int i) throws IOException {
-        return super.getTileHeight(i);
-    }
-
-    @Override
-    public int getTileGridXOffset(int i) throws IOException {
-        return super.getTileGridXOffset(i);
-    }
-
-    @Override
-    public int getTileGridYOffset(int i) throws IOException {
-        return super.getTileGridYOffset(i);
-    }
-
-    @Override
-    public BufferedImage readTile(int imageIndex, int x, int y) throws IOException {
-        readHeader();
-
-        checkImageIndex(imageIndex);
-
-        Iterator<ImageTypeSpecifier> it = getImageTypes(imageIndex);
-
-        if (!it.hasNext()) {
-            throw new IllegalArgumentException("bad iterator!");
-        }
-
-        ImageTypeSpecifier its = it.next();
-
-        ColorModel cm = its.getColorModel();
-        SampleModel sm = its.getSampleModel(OZF_TILE_WIDTH, OZF_TILE_HEIGHT);
-
-        byte[] tileData = getTile(imageIndex, x, y);
-
-        DataBuffer tileDataBuffer = new DataBufferByte(tileData, OZF_TILE_WIDTH * OZF_TILE_HEIGHT);
-
-        WritableRaster writableRaster = Raster.createWritableRaster(sm, tileDataBuffer, null);
-
-        return new BufferedImage(cm, writableRaster, false, null);
-    }
-
-    @Override
-    public boolean readerSupportsThumbnails() {
-        return true;
-    }
-
-    @Override
-    public boolean hasThumbnails(int imageIndex) throws IOException {
-        readHeader();
-
-        checkImageIndex(imageIndex);
-
-        return imageIndex == imageInfo.size() - 1 ||
-                imageIndex == imageInfo.size() - 2;
-    }
-
-    @Override
-    public int getNumThumbnails(int i) throws IOException {
-        return super.getNumThumbnails(i);
-    }
-
-    @Override
-    public int getThumbnailWidth(int i, int i1) throws IOException {
-        return super.getThumbnailWidth(i, i1);
-    }
-
-    @Override
-    public int getThumbnailHeight(int i, int i1) throws IOException {
-        return super.getThumbnailHeight(i, i1);
-    }
-
-    @Override
-    public BufferedImage readThumbnail(int i, int i1) throws IOException {
-        return super.readThumbnail(i, i1);
-    }
-
     private byte[] getTile(int imageIndex, int x, int y) throws IOException {
-        checkImageIndex(imageIndex);
+        ZoomLevel zoomLevel = this.zoomLevels.get(imageIndex);
 
-        ImageInfo imageInfo = this.imageInfo.get(imageIndex);
+        int i = y * zoomLevel.xTiles + x;
 
-        int i = y * imageInfo.xTiles + x;
-
-        int tileSize = imageInfo.tileOffsetTable[i + 1] - imageInfo.tileOffsetTable[i];
+        int tileSize = zoomLevel.tileOffsetTable[i + 1] - zoomLevel.tileOffsetTable[i];
 
         byte[] tile = new byte[tileSize];
 
-        stream.seek(imageInfo.tileOffsetTable[i]);
+        stream.seek(zoomLevel.tileOffsetTable[i]);
         stream.readFully(tile);
 
         if (isOzf3) {
-            if (imageInfo.encryptionDepth == -1) {
+            if (zoomLevel.encryptionDepth == -1) {
                 decrypt(tile, 0, tileSize, key);
             } else {
-                decrypt(tile, 0, imageInfo.encryptionDepth, key);
+                decrypt(tile, 0, zoomLevel.encryptionDepth, key);
             }
         }
 

@@ -29,11 +29,11 @@ public final class OzfImageReaderSpi extends ImageReaderSpi {
 
     @Override
     public boolean canDecodeInput(Object input) throws IOException {
-        if (!(input instanceof ImageInputStream)) {
+        if (!(input instanceof FileImageInputStream)) {
             return false;
         }
 
-        ImageInputStream stream = (ImageInputStream) input;
+        ImageInputStream stream = (FileImageInputStream) input;
 
         byte[] b = new byte[14];
 

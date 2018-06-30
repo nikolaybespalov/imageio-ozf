@@ -31,10 +31,6 @@ public class OzfImageReadTest {
 
             reader.setInput(is);
 
-            assertTrue(reader.readerSupportsThumbnails());
-            assertEquals(300, reader.getThumbnailWidth(0, 0));
-            assertEquals(150, reader.getThumbnailHeight(0, 0));
-
             // checks basic reader capabilities
             assertEquals(8, reader.getNumImages(false));
             assertNotNull(reader.readTile(0, 0, 0));
@@ -42,6 +38,11 @@ public class OzfImageReadTest {
             assertEquals(64, reader.getTileHeight(0));
             assertEquals(0, reader.getTileGridXOffset(0));
             assertEquals(0, reader.getTileGridYOffset(0));
+            assertNull(reader.getStreamMetadata());
+
+            assertTrue(reader.readerSupportsThumbnails());
+            assertEquals(300, reader.getThumbnailWidth(0, 0));
+            assertEquals(150, reader.getThumbnailHeight(0, 0));
 
             ImageReadParam param0 = new ImageReadParam();
             param0.setSourceRegion(new Rectangle(0, 0, 499, 250));
@@ -51,6 +52,7 @@ public class OzfImageReadTest {
             assertTrue(reader.hasThumbnails(0));
             assertEquals(1, reader.getNumThumbnails(0));
             assertTrue(reader.isImageTiled(0));
+            assertNull(reader.getImageMetadata(0));
 
             ImageReadParam param1 = new ImageReadParam();
             param0.setSourceRegion(new Rectangle(0, 0, 374, 187));
@@ -60,6 +62,7 @@ public class OzfImageReadTest {
             assertTrue(reader.hasThumbnails(1));
             assertEquals(1, reader.getNumThumbnails(1));
             assertTrue(reader.isImageTiled(1));
+            assertNull(reader.getImageMetadata(1));
 
             ImageReadParam param2 = new ImageReadParam();
             param0.setSourceRegion(new Rectangle(0, 0, 249, 125));
@@ -69,6 +72,7 @@ public class OzfImageReadTest {
             assertTrue(reader.hasThumbnails(2));
             assertEquals(1, reader.getNumThumbnails(2));
             assertTrue(reader.isImageTiled(2));
+            assertNull(reader.getImageMetadata(2));
 
             ImageReadParam param3 = new ImageReadParam();
             param0.setSourceRegion(new Rectangle(0, 0, 166, 83));
@@ -78,6 +82,7 @@ public class OzfImageReadTest {
             assertTrue(reader.hasThumbnails(3));
             assertEquals(1, reader.getNumThumbnails(3));
             assertTrue(reader.isImageTiled(3));
+            assertNull(reader.getImageMetadata(3));
 
             ImageReadParam param4 = new ImageReadParam();
             param0.setSourceRegion(new Rectangle(0, 0, 99, 50));
@@ -87,6 +92,7 @@ public class OzfImageReadTest {
             assertTrue(reader.hasThumbnails(4));
             assertEquals(1, reader.getNumThumbnails(4));
             assertTrue(reader.isImageTiled(4));
+            assertNull(reader.getImageMetadata(4));
 
             ImageReadParam param5 = new ImageReadParam();
             param0.setSourceRegion(new Rectangle(0, 0, 49, 25));
@@ -96,6 +102,7 @@ public class OzfImageReadTest {
             assertTrue(reader.hasThumbnails(5));
             assertEquals(1, reader.getNumThumbnails(5));
             assertTrue(reader.isImageTiled(5));
+            assertNull(reader.getImageMetadata(5));
 
             ImageReadParam param6 = new ImageReadParam();
             param0.setSourceRegion(new Rectangle(0, 0, 24, 12));
@@ -105,6 +112,7 @@ public class OzfImageReadTest {
             assertTrue(reader.hasThumbnails(6));
             assertEquals(1, reader.getNumThumbnails(6));
             assertTrue(reader.isImageTiled(6));
+            assertNull(reader.getImageMetadata(6));
 
             ImageReadParam param7 = new ImageReadParam();
             param0.setSourceRegion(new Rectangle(0, 0, 12, 6));
@@ -114,6 +122,7 @@ public class OzfImageReadTest {
             assertTrue(reader.hasThumbnails(7));
             assertEquals(1, reader.getNumThumbnails(7));
             assertTrue(reader.isImageTiled(7));
+            assertNull(reader.getImageMetadata(7));
 
             // check for expected exception when image index is out of bounds
             try {

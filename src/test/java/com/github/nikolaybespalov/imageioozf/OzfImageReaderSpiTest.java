@@ -33,7 +33,7 @@ public class OzfImageReaderSpiTest {
         // Checks if URL cannot be read.
         // Reading from a URL leads to the creation of FileCacheImageInputStream,
         // and this leads to the impossibility to know the size of the stream.
-        assertThrows(IllegalArgumentException.class, () -> assertNotNull(ImageIO.read(Resources.getResource("com/github/nikolaybespalov/imageioozf/test-data/World.ozf2"))));
+        assertNull(ImageIO.read(Resources.getResource("com/github/nikolaybespalov/imageioozf/test-data/World.ozf2")));
 
         // Checks not .ozf
         assertNull(ImageIO.read(FileUtils.toFile(Resources.getResource("com/github/nikolaybespalov/imageioozf/test-data/test.txt"))));

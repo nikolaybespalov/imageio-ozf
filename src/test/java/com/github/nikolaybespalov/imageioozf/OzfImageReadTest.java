@@ -2,7 +2,6 @@ package com.github.nikolaybespalov.imageioozf;
 
 import com.google.common.io.Resources;
 import org.apache.commons.io.FileUtils;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import javax.imageio.ImageReadParam;
@@ -48,6 +47,7 @@ public class OzfImageReadTest {
             assertEquals(300, reader.getThumbnailWidth(0, 0));
             assertEquals(150, reader.getThumbnailHeight(0, 0));
             assertThrows(IndexOutOfBoundsException.class, () -> reader.readThumbnail(0, 123));
+            assertThrows(UnsupportedOperationException.class, () -> reader.readThumbnail(0, 0));
 
             // Image 0
             ImageReadParam param0 = new ImageReadParam();
@@ -130,13 +130,12 @@ public class OzfImageReadTest {
             assertTrue(reader.isImageTiled(7));
             assertNull(reader.getImageMetadata(7));
 
-            // check for expected exception when image index is out of bounds
-            try {
-                reader.read(8);
-                fail();
-            } catch (IndexOutOfBoundsException e) {
-                // do nothing
-            }
+            ImageReadParam param = new ImageReadParam();
+            param.setSourceRegion(new Rectangle(12, 21, 21, 12));
+            BufferedImage image = reader.read(0, param);
+            assertNotNull(image);
+            assertEquals(21, image.getWidth());
+            assertEquals(12, image.getHeight());
         }
     }
 
@@ -196,22 +195,22 @@ public class OzfImageReadTest {
         }
     }
 
-    /**
-     * This test checks OZF4 image.
-     */
-    @Ignore
-    public void readWorldOzf4() throws IOException {
-        try (ImageInputStream is = new FileImageInputStream(FileUtils.toFile(Resources.getResource("com/github/nikolaybespalov/imageioozf/test-data/World.ozf4")))) {
-            ImageReader reader = new OzfImageReader(null);
-
-            reader.setInput(is);
-
-            // checks basic reader capabilities
-            assertEquals(2108, reader.getWidth(0));
-            assertEquals(2048, reader.getHeight(0));
-            assertEquals(5, reader.getNumImages(false));
-        }
-    }
+//    /**
+//     * This test checks OZF4 image.
+//     */
+//    @Ignore
+//    public void readWorldOzf4() throws IOException {
+//        try (ImageInputStream is = new FileImageInputStream(FileUtils.toFile(Resources.getResource("com/github/nikolaybespalov/imageioozf/test-data/World.ozf4")))) {
+//            ImageReader reader = new OzfImageReader(null);
+//
+//            reader.setInput(is);
+//
+//            // checks basic reader capabilities
+//            assertEquals(2108, reader.getWidth(0));
+//            assertEquals(2048, reader.getHeight(0));
+//            assertEquals(5, reader.getNumImages(false));
+//        }
+//    }
 
     /**
      * This test checks "short" OZF3 file.
@@ -228,7 +227,28 @@ public class OzfImageReadTest {
             // Codacy says "JUnit tests should include assert() or fail()".
             assertNotNull(reader);
 
-            assertThrows(IOException.class, () -> assertNotNull(reader.readTile(0, 0, 0)));
+            assertThrows(IllegalArgumentException.class, () -> assertNotNull(reader.readTile(0, 0, 0)));
+        }
+    }
+
+    /**
+     * This test checks "corrupted" OZF2 file.
+     * <p>
+     * This means that the header contains invalid values.
+     * 78 77 00 00 00 00 40 00 01 00 36 04 00 00 vs
+     * 78 77 00 00 00 00 FF 00 FF 00 FF FF 00 00
+     */
+    @Test
+    public void testCorruptedOzf2() throws IOException {
+        try (ImageInputStream is = new FileImageInputStream(FileUtils.toFile(Resources.getResource("com/github/nikolaybespalov/imageioozf/test-data/Corrupted.ozf2")))) {
+            ImageReader reader = new OzfImageReader(null);
+
+            reader.setInput(is);
+
+            // Codacy says "JUnit tests should include assert() or fail()".
+            assertNotNull(reader);
+
+            assertThrows(IllegalArgumentException.class, () -> assertNotNull(reader.readTile(0, 0, 0)));
         }
     }
 }

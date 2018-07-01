@@ -390,7 +390,7 @@ class OzfImageReader extends ImageReader {
             int keyTableSize = keyTable.length;
 
             if (keyTableSize < INITIAL_KEY_INDEX + 1) {
-                throw new IOException("too few data!");
+                throw new IllegalArgumentException("too few data!");
             }
 
             byte initialKey = keyTable[INITIAL_KEY_INDEX];
@@ -408,7 +408,7 @@ class OzfImageReader extends ImageReader {
                 header[8] == (byte) 0x01 && header[9] == (byte) 0x00 &&
                 header[10] == (byte) 0x36 && header[11] == (byte) 0x04 &&
                 header[12] == (byte) 0x00 && header[13] == (byte) 0x00)) {
-            throw new IOException("an actual header is not equals expected");
+            throw new IllegalArgumentException("an actual header is not equals expected");
         }
 
         readImagesInformation();
@@ -530,22 +530,18 @@ class OzfImageReader extends ImageReader {
         return stream.readInt();
     }
 
-    private int decompressTile(byte[] source, byte[] dest) {
+    private int decompressTile(byte[] source, byte[] dest) throws IOException {
         InputStream inf = new InflaterInputStream(new ByteArrayInputStream(source));
 
         ByteArrayOutputStream bas = new ByteArrayOutputStream(OZF_TILE_WIDTH * OZF_TILE_HEIGHT);
 
-        try {
-            int decompressedBytes = IOUtils.copy(inf, bas);
+        int decompressedBytes = IOUtils.copy(inf, bas);
 
-            assert decompressedBytes == OZF_TILE_WIDTH * OZF_TILE_HEIGHT;
+        assert decompressedBytes == OZF_TILE_WIDTH * OZF_TILE_HEIGHT;
 
-            System.arraycopy(bas.toByteArray(), 0, dest, 0, OZF_TILE_WIDTH * OZF_TILE_HEIGHT);
+        System.arraycopy(bas.toByteArray(), 0, dest, 0, OZF_TILE_WIDTH * OZF_TILE_HEIGHT);
 
-            return decompressedBytes;
-        } catch (IOException e) {
-            return -1;
-        }
+        return decompressedBytes;
     }
 
     private byte[] getTile(int imageIndex, int x, int y) throws IOException {

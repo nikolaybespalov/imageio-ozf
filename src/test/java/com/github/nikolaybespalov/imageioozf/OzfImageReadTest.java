@@ -32,18 +32,24 @@ public class OzfImageReadTest {
             reader.setInput(is);
 
             // checks basic reader capabilities
+            assertNull(reader.getStreamMetadata());
+
             assertEquals(8, reader.getNumImages(false));
+            assertThrows(IndexOutOfBoundsException.class, () -> reader.read(123));
             assertNotNull(reader.readTile(0, 0, 0));
+            assertThrows(IllegalArgumentException.class, () -> reader.readTile(0, 0, 123));
+            assertThrows(IllegalArgumentException.class, () -> reader.readTile(0, 123, 0));
             assertEquals(64, reader.getTileWidth(0));
             assertEquals(64, reader.getTileHeight(0));
             assertEquals(0, reader.getTileGridXOffset(0));
             assertEquals(0, reader.getTileGridYOffset(0));
-            assertNull(reader.getStreamMetadata());
 
             assertTrue(reader.readerSupportsThumbnails());
             assertEquals(300, reader.getThumbnailWidth(0, 0));
             assertEquals(150, reader.getThumbnailHeight(0, 0));
+            assertThrows(IndexOutOfBoundsException.class, () -> reader.readThumbnail(0, 123));
 
+            // Image 0
             ImageReadParam param0 = new ImageReadParam();
             param0.setSourceRegion(new Rectangle(0, 0, 499, 250));
             BufferedImage image0 = reader.read(0, param0);

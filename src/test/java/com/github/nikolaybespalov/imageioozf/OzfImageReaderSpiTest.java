@@ -19,6 +19,8 @@ public class OzfImageReaderSpiTest {
 
         assertTrue(ImageIO.getImageReadersByFormatName("OziExplorer Image File").hasNext());
         assertEquals("OziExplorer Image File Reader", ImageIO.getImageReadersByFormatName("OziExplorer Image File").next().getOriginatingProvider().getDescription(Locale.getDefault()));
+        assertFalse(ImageIO.getImageReadersByFormatName("OziExplorer Image File").next().getOriginatingProvider().canDecodeInput("this is not an ImageInputStream"));
+
 
         assertTrue(ImageIO.getImageReadersByMIMEType("image/ozf2").hasNext());
         assertTrue(ImageIO.getImageReadersByMIMEType("image/ozf3").hasNext());

@@ -2,6 +2,7 @@ package com.github.nikolaybespalov.imageioozf;
 
 import javax.imageio.ImageReader;
 import javax.imageio.spi.ImageReaderSpi;
+import javax.imageio.stream.FileCacheImageInputStream;
 import javax.imageio.stream.FileImageInputStream;
 import javax.imageio.stream.ImageInputStream;
 import java.io.File;
@@ -11,16 +12,12 @@ import java.util.Locale;
 import static com.github.nikolaybespalov.imageioozf.OzfDecrypter.decrypt;
 
 public final class OzfImageReaderSpi extends ImageReaderSpi {
+    private static final String description = "OziExplorer Image File Reader";
     private static final String[] suffixes = {"ozf2", "ozf3"};
-
     private static final String[] formatNames = {"OziExplorer Image File"};
-
     private static final String[] MIMETypes = {"image/ozf2", "image/ozf3"};
-
     private static final String version = "1.0";
-
     private static final String readerCN = "com.github.nikolaybespalov.imageioozf.OzfImageReader";
-
     private static final String vendorName = "Nikolay Bespalov";
 
     public OzfImageReaderSpi() {
@@ -29,11 +26,15 @@ public final class OzfImageReaderSpi extends ImageReaderSpi {
 
     @Override
     public boolean canDecodeInput(Object input) throws IOException {
-        if (!(input instanceof FileImageInputStream)) {
+        if (!(input instanceof ImageInputStream)) {
             return false;
         }
 
-        ImageInputStream stream = (FileImageInputStream) input;
+        if (input instanceof FileCacheImageInputStream) {
+            return false;
+        }
+
+        ImageInputStream stream = (ImageInputStream) input;
 
         byte[] b = new byte[14];
 
@@ -78,6 +79,6 @@ public final class OzfImageReaderSpi extends ImageReaderSpi {
 
     @Override
     public String getDescription(Locale locale) {
-        return "OziExplorer Image File Reader";
+        return description;
     }
 }

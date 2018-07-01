@@ -7,7 +7,7 @@ import javax.imageio.ImageReader;
 import javax.imageio.ImageTypeSpecifier;
 import javax.imageio.metadata.IIOMetadata;
 import javax.imageio.spi.ImageReaderSpi;
-import javax.imageio.stream.FileImageInputStream;
+import javax.imageio.stream.FileCacheImageInputStream;
 import javax.imageio.stream.ImageInputStream;
 import java.awt.*;
 import java.awt.image.*;
@@ -85,11 +85,15 @@ class OzfImageReader extends ImageReader {
 
     @Override
     public void setInput(Object input, boolean seekForwardOnly, boolean ignoreMetadata) {
-        if (!(input instanceof FileImageInputStream)) {
-            throw new IllegalArgumentException("input not an FileImageInputStream!");
+        if (!(input instanceof ImageInputStream)) {
+            throw new IllegalArgumentException("input not an ImageInputStream!");
         }
 
-        stream = (FileImageInputStream) input;
+        if (input instanceof FileCacheImageInputStream) {
+            throw new IllegalArgumentException("unsupported input FileCacheImageInputStream!");
+        }
+
+        stream = (ImageInputStream) input;
         stream.setByteOrder(ByteOrder.LITTLE_ENDIAN);
     }
 

@@ -37,13 +37,8 @@ class OzfImageReader extends ImageReader {
     private static final int OZF_ENCRYPTION_DEPTH = 16;
     private ImageInputStream stream;
     private ImageInputStream encryptedStream;
-    private boolean headerRead = false;
     private boolean isOzf3;
     private byte key;
-    //    private int width;
-//    private int height;
-//    private int bpp;
-//    private int depth;
     private List<ZoomLevel> zoomLevels = new ArrayList<>();
     private List<ZoomLevel> thumbnails = new ArrayList<>();
 
@@ -376,10 +371,6 @@ class OzfImageReader extends ImageReader {
     }
 
     private void readHeader() throws IOException {
-        if (headerRead) {
-            return;
-        }
-
         byte[] header = readFileHeader();
 
         isOzf3 = (header[0] == (byte) 0x80) && (header[1] == (byte) 0x77);
@@ -412,8 +403,6 @@ class OzfImageReader extends ImageReader {
         }
 
         readImagesInformation();
-
-        headerRead = true;
     }
 
     private byte[] readFileHeader() throws IOException {

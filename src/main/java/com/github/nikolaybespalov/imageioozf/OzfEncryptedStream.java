@@ -4,7 +4,7 @@ import javax.imageio.stream.ImageInputStream;
 import javax.imageio.stream.ImageInputStreamImpl;
 import java.io.IOException;
 
-import static com.github.nikolaybespalov.imageioozf.OzfDecrypter.decrypt;
+import static com.github.nikolaybespalov.imageioozf.OzfDecoder.decode;
 
 class OzfEncryptedStream extends ImageInputStreamImpl {
     private final ImageInputStream stream;
@@ -30,7 +30,7 @@ class OzfEncryptedStream extends ImageInputStreamImpl {
     public int read(byte[] bytes, int offset, int length) throws IOException {
         int n = stream.read(bytes, offset, length);
 
-        decrypt(bytes, offset, length, key);
+        decode(bytes, offset, length, key);
 
         return n;
     }

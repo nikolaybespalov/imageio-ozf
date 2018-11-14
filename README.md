@@ -4,7 +4,6 @@
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/9637e139b6704e2dbd2e206c2405cd0e)](https://www.codacy.com/app/nikolaybespalov/imageio-ozf)
 [![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.github.nikolaybespalov/imageio-ozf/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.github.nikolaybespalov/imageio-ozf)
 
-
 ImageIO plugin that allows you to use OziExplorer raster files(ozf2/ozf3) in your Java application.
 
 ![OziExplorer](README.png "OziExplorer")

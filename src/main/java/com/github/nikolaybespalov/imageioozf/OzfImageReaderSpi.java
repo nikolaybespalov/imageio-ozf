@@ -9,7 +9,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Locale;
 
-import static com.github.nikolaybespalov.imageioozf.OzfDecrypter.decrypt;
+import static com.github.nikolaybespalov.imageioozf.OzfDecoder.decode;
 
 public final class OzfImageReaderSpi extends ImageReaderSpi {
     private static final String description = "OziExplorer Image File Reader";
@@ -58,7 +58,7 @@ public final class OzfImageReaderSpi extends ImageReaderSpi {
 
             stream.readFully(asd);
 
-            decrypt(b, 0, 14, asd[0x93]);
+            decode(b, 0, 14, asd[0x93]);
 
             stream.reset();
         } else if (!(b[0] == (byte) 0x78 && b[1] == (byte) 0x77)) {

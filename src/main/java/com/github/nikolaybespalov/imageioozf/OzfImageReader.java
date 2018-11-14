@@ -20,7 +20,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.zip.InflaterInputStream;
 
-import static com.github.nikolaybespalov.imageioozf.OzfDecrypter.decrypt;
+import static com.github.nikolaybespalov.imageioozf.OzfDecoder.decode;
 
 /**
  * https://docs.oracle.com/javase/8/docs/technotes/guides/imageio/spec/imageio_guideTOC.fm.html
@@ -40,8 +40,8 @@ class OzfImageReader extends ImageReader {
     private boolean gotHeader = false;
     private boolean isOzf3;
     private byte key;
-    private List<ZoomLevel> zoomLevels = new ArrayList<>();
-    private List<ZoomLevel> thumbnails = new ArrayList<>();
+    private final List<ZoomLevel> zoomLevels = new ArrayList<>();
+    private final List<ZoomLevel> thumbnails = new ArrayList<>();
 
     private class ZoomLevel {
         private final int width;
@@ -395,7 +395,7 @@ class OzfImageReader extends ImageReader {
 
             encryptedStream = new OzfEncryptedStream(stream, key);
 
-            decrypt(header, 0, 14, initialKey);
+            decode(header, 0, 14, initialKey);
 
             encryptedStream.seek(14 + 1 + keyTableSize);
         }
@@ -553,7 +553,7 @@ class OzfImageReader extends ImageReader {
         stream.readFully(tile);
 
         if (isOzf3) {
-            decrypt(tile, 0, OZF_ENCRYPTION_DEPTH, key);
+            decode(tile, 0, OZF_ENCRYPTION_DEPTH, key);
         }
 
         byte[] decompressedTile = new byte[OZF_TILE_WIDTH * OZF_TILE_HEIGHT];

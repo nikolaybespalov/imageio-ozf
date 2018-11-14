@@ -17,7 +17,7 @@ public class OzfEncryptedStreamTest {
 
         int b = stream.read();
 
-        assertEquals(116, b);
+        assertEquals(108, b);
 
         while (b != -1) {
             b = stream.read();

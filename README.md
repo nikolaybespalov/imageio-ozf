@@ -28,3 +28,5 @@ Or to your _build.gradle_
     }
 ```
 And your project will be able to work with .ozf files!
+
+Look at [gt-ozi](https://github.com/nikolaybespalov/gt-ozi) if you build your app on GeoTools stack.

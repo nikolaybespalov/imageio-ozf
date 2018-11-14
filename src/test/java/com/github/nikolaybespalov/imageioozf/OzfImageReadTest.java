@@ -1,7 +1,6 @@
 package com.github.nikolaybespalov.imageioozf;
 
-import com.google.common.io.Resources;
-import org.apache.commons.io.FileUtils;
+import com.github.davidcarboni.ResourceUtils;
 import org.junit.Test;
 
 import javax.imageio.ImageReadParam;
@@ -25,7 +24,7 @@ public class OzfImageReadTest {
      */
     @Test
     public void readWorldOzf2() throws IOException {
-        try (ImageInputStream is = new FileImageInputStream(FileUtils.toFile(Resources.getResource("com/github/nikolaybespalov/imageioozf/test-data/World.ozf2")))) {
+        try (ImageInputStream is = new FileImageInputStream(ResourceUtils.getFile("/com/github/nikolaybespalov/imageioozf/test-data/World.ozf2"))) {
             ImageReader reader = new OzfImageReader(null);
 
             reader.setInput(is);
@@ -144,7 +143,7 @@ public class OzfImageReadTest {
      */
     @Test
     public void readWorldOzf3() throws IOException {
-        try (ImageInputStream is = new FileImageInputStream(FileUtils.toFile(Resources.getResource("com/github/nikolaybespalov/imageioozf/test-data/World.ozf3")))) {
+        try (ImageInputStream is = new FileImageInputStream(ResourceUtils.getFile("/com/github/nikolaybespalov/imageioozf/test-data/World.ozf3"))) {
             ImageReader reader = new OzfImageReader(null);
 
             reader.setInput(is);
@@ -219,7 +218,7 @@ public class OzfImageReadTest {
      */
     @Test
     public void readShortOzf3() throws IOException {
-        try (ImageInputStream is = new FileImageInputStream(FileUtils.toFile(Resources.getResource("com/github/nikolaybespalov/imageioozf/test-data/Short.ozf3")))) {
+        try (ImageInputStream is = new FileImageInputStream(ResourceUtils.getFile("/com/github/nikolaybespalov/imageioozf/test-data/Short.ozf3"))) {
             ImageReader reader = new OzfImageReader(null);
 
             reader.setInput(is);
@@ -240,7 +239,7 @@ public class OzfImageReadTest {
      */
     @Test
     public void testCorruptedOzf2() throws IOException {
-        try (ImageInputStream is = new FileImageInputStream(FileUtils.toFile(Resources.getResource("com/github/nikolaybespalov/imageioozf/test-data/Corrupted.ozf2")))) {
+        try (ImageInputStream is = new FileImageInputStream(ResourceUtils.getFile("/com/github/nikolaybespalov/imageioozf/test-data/Corrupted.ozf2"))) {
             ImageReader reader = new OzfImageReader(null);
 
             reader.setInput(is);

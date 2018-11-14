@@ -1,7 +1,6 @@
 package com.github.nikolaybespalov.imageioozf;
 
-import com.google.common.io.Resources;
-import org.apache.commons.io.FileUtils;
+import com.github.davidcarboni.ResourceUtils;
 import org.junit.Test;
 
 import javax.imageio.ImageIO;
@@ -26,21 +25,16 @@ public class OzfImageReaderSpiTest {
         assertTrue(ImageIO.getImageReadersByMIMEType("image/ozf3").hasNext());
 
         // Checks ability to read from a File.
-        assertNotNull(ImageIO.read(FileUtils.toFile(Resources.getResource("com/github/nikolaybespalov/imageioozf/test-data/World.ozf2"))));
-        assertNotNull(ImageIO.read(FileUtils.toFile(Resources.getResource("com/github/nikolaybespalov/imageioozf/test-data/World.ozf3"))));
+        assertNotNull(ImageIO.read(ResourceUtils.getFile("/com/github/nikolaybespalov/imageioozf/test-data/World.ozf2")));
+        assertNotNull(ImageIO.read(ResourceUtils.getFile("/com/github/nikolaybespalov/imageioozf/test-data/World.ozf3")));
 
         // Checks if a .ozf4 cannot be read.
-        assertThrows(IOException.class, () -> ImageIO.read(FileUtils.toFile(Resources.getResource("com/github/nikolaybespalov/imageioozf/test-data/World.ozf4"))));
-
-        // Checks if URL cannot be read.
-        // Reading from a URL leads to the creation of FileCacheImageInputStream,
-        // and this leads to the impossibility to know the size of the stream.
-        assertNull(ImageIO.read(Resources.getResource("com/github/nikolaybespalov/imageioozf/test-data/World.ozf2")));
+        assertThrows(IOException.class, () -> ImageIO.read(ResourceUtils.getFile("/com/github/nikolaybespalov/imageioozf/test-data/World.ozf4")));
 
         // Checks not .ozf
-        assertNull(ImageIO.read(FileUtils.toFile(Resources.getResource("com/github/nikolaybespalov/imageioozf/test-data/test.txt"))));
+        assertNull(ImageIO.read(ResourceUtils.getFile("/com/github/nikolaybespalov/imageioozf/test-data/test.txt")));
 
         // Checks "short" .ozf3
-        assertNull(ImageIO.read(FileUtils.toFile(Resources.getResource("com/github/nikolaybespalov/imageioozf/test-data/Short.ozf3"))));
+        assertNull(ImageIO.read(ResourceUtils.getFile("/com/github/nikolaybespalov/imageioozf/test-data/Short.ozf3")));
     }
 }

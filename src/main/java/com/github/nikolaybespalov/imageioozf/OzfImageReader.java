@@ -146,6 +146,12 @@ class OzfImageReader extends ImageReader {
 
     @Override
     public BufferedImage read(int imageIndex, ImageReadParam param) throws IOException {
+        boolean aborted = false;
+
+        clearAbortRequest();
+
+        processImageStarted(imageIndex);
+
         readHeader();
 
         checkImageIndex(imageIndex);
@@ -160,6 +166,9 @@ class OzfImageReader extends ImageReader {
         int xTileIndex = sourceRegion.x / OZF_TILE_WIDTH;
         int yTileIndex = sourceRegion.y / OZF_TILE_HEIGHT;
 
+        final int totalTiles = (yTiles - yTileIndex) * (xTiles - xTileIndex);
+        int tilesDecoded = 0;
+
         int x1 = sourceRegion.x;
         int y1 = sourceRegion.y;
 
@@ -168,6 +177,12 @@ class OzfImageReader extends ImageReader {
 
         for (int y = yTileIndex; y < yTiles; y++) {
             for (int x = xTileIndex; x < xTiles; x++) {
+                if (abortRequested()) {
+                    aborted = true;
+                    y = yTiles;
+                    break;
+                }
+
                 byte[] tile = getTile(imageIndex, x, y);
 
                 int a = x * OZF_TILE_WIDTH;
@@ -210,7 +225,16 @@ class OzfImageReader extends ImageReader {
                 assert (ix2 - ix1) == (tx2 - tx1);
 
                 copyPixels(tile, result, tx1, ty1, tx2, ty2, iy1, ix1, sourceRegion.width);
+
+                tilesDecoded++;
+                processImageProgress(100.0F * tilesDecoded / totalTiles);
             }
+        }
+
+        if (aborted) {
+            processReadAborted();
+        } else {
+            processImageComplete();
         }
 
         Iterator<ImageTypeSpecifier> it = getImageTypes(imageIndex);
